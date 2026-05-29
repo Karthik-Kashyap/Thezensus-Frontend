@@ -1,30 +1,51 @@
-# VoteAnything — Frontend (Next.js 14)
+# Thezensus — Frontend (Next.js 16, App Router)
 
-The `web-service` from `DESIGN-001` §6.1 / §9. Next.js 14 App Router; SSR/ISR per page;
-React Query for server state; AppSync WebSocket for live vote counts; acts as a BFF proxy
-to the backend services.
+The web client for Thezensus. Talks to the backend **gateway** under `/api/*` with a cookie
+session (Google OAuth + a local dev-login stand-in). Built with Tailwind + a small set of
+shadcn-style primitives (copied into `src/components/ui`), `next-themes` (light/dark), and
+React Query for server state.
 
-## Pages (DESIGN-001 §9)
+## Stack
+- **Next.js 16** App Router, **React 19**
+- **Tailwind CSS** with CSS-variable theme tokens (`src/app/globals.css`)
+- **Radix UI** primitives wrapped in `src/components/ui` · **lucide-react** icons · **sonner** toasts
+- **@tanstack/react-query** for fetching/caching
+- Fonts via `next/font`: **Fraunces** (display) + **Plus Jakarta Sans** (UI)
 
-| Route | File | Rendering | Auth |
-|---|---|---|---|
-| `/` | `app/page.tsx` | ISR 30s | none |
-| `/poll/create` | `app/poll/create/page.tsx` | CSR | required |
-| `/poll/[id]` | `app/poll/[id]/page.tsx` | SSR | none to view |
-| `/topic/[slug]` | `app/topic/[slug]/page.tsx` | ISR 60s | none |
-| `/profile/[userId]` | `app/profile/[userId]/page.tsx` | SSR | none |
-| `/me` | `app/me/page.tsx` | CSR | required |
-| `/auth/callback` | `app/auth/callback/page.tsx` | CSR | n/a |
+## Architecture (strict layering)
+- `src/app/*` — routes only; thin, compose components + call `lib`.
+- `src/components/ui/*` — generic primitives. `src/components/<feature>/*` — feature components.
+- `src/lib/*` — one typed client per backend service (`polls`, `votes`, `communities`,
+  `comments`, `media`, `profile`), plus `api.ts` (fetch wrapper), `types.ts`, `constants.ts`,
+  `session.ts`, `media-url.ts`, `format.ts`. Components call these — never `fetch` directly.
+
+## Pages
+| Route | Purpose | Auth |
+|---|---|---|
+| `/` | Logged-out hero / logged-in community feed | none |
+| `/me` | Own profile + settings + avatar upload | required |
+| `/profile/[userId]` | Public profile + their polls | none |
+| `/c/new` | Create a community | required |
+| `/c/[communityId]` | Community page (poll feed + join) | visibility-gated |
+| `/poll/new` | Create a poll | required |
+| `/poll/[pollId]` | Poll detail — vote (live results) + comments | none to view |
 
 ## Develop
-
 ```bash
-cp .env.example .env.local   # fill in API + Cognito + AppSync values
+cp .env.example .env.local   # defaults point at the local gateway (:8080)
 npm install
-npm run dev
+npm run dev                  # http://localhost:3000
 ```
+The backend stack (LocalStack + 6 services + gateway) must be running first — see
+`../backend/docs/LOCAL_DEV.md`. Use the **Dev sign-in** in the login dialog for offline auth.
 
-> **Scaffold status:** pages and components render placeholders and are wired to the API
-> client / Amplify config. Data fetching and interactivity are marked `TODO(DESIGN §...)`.
-> Cognito/AppSync env values stay blank until the corresponding infra + Google OAuth
-> prerequisites are in place.
+## Media / images
+Image fields are stored as serving **keys**. `src/lib/media-url.ts` resolves them: with
+`NEXT_PUBLIC_MEDIA_BASE` (CloudFront) set it builds a public URL; locally it presigns the
+**current user's own** media via media-service and falls back to initials for everyone else
+(other users' media is owner-gated — an expected local-dev limitation).
+
+## Not yet built (backend pending — shown as "coming soon" stubs)
+Global trending feed, topics, user-following, notifications inbox, comment up/down-vote +
+threading, creator analytics dashboards. Community moderation (roles/bans/pins/reports) and
+subscribe-time segment questions are deferred to a later frontend slice.

@@ -1,12 +1,67 @@
 "use client";
 
-// My dashboard — CSR, auth-required (DESIGN-001 §9).
-export default function MyDashboardPage() {
-  // TODO(DESIGN §9): redirect to login if unauthenticated.
-  // TODO(DESIGN §9): tabs "My Polls" / "My Votes" from /users/me/polls and /users/me/votes.
+import { useSession } from "@/lib/session";
+import { relativeTime } from "@/lib/format";
+import { ProfileEditor } from "@/components/profile/ProfileEditor";
+import { AvatarUploader } from "@/components/profile/AvatarUploader";
+import { SignInGate } from "@/components/auth/SignInGate";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Card, CardContent } from "@/components/ui/card";
+
+export default function MyProfilePage() {
+  const { user, isLoading } = useSession();
+
+  if (isLoading) {
+    return (
+      <div className="mx-auto max-w-2xl space-y-6">
+        <Skeleton className="h-24 w-full" />
+        <Skeleton className="h-64 w-full" />
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <SignInGate
+        title="Your profile"
+        message="Sign in to view and edit your profile."
+        redirectTo="/me"
+      />
+    );
+  }
+
+  const stats = [
+    { label: "Polls", value: user.stats.pollsCreated },
+    { label: "Votes cast", value: user.stats.votesCast },
+    { label: "Votes received", value: user.stats.totalVotesReceived },
+  ];
+
   return (
-    <main>
-      <h1>My dashboard</h1>
-    </main>
+    <div className="mx-auto max-w-2xl space-y-6">
+      <Card className="overflow-hidden">
+        <div className="grain relative h-20 bg-gradient-to-r from-primary/20 via-secondary/15 to-primary/10" />
+        <CardContent className="-mt-10 space-y-4">
+          <div className="flex items-end justify-between">
+            <AvatarUploader user={user} />
+          </div>
+          <div>
+            <h1 className="font-display text-2xl font-semibold tracking-tight">{user.displayName}</h1>
+            <p className="text-sm text-muted-foreground">
+              {user.settings.email} · joined {relativeTime(user.createdAt)}
+            </p>
+          </div>
+          <div className="flex gap-6 border-t pt-4">
+            {stats.map((s) => (
+              <div key={s.label}>
+                <div className="font-display text-xl font-semibold">{s.value}</div>
+                <div className="text-xs text-muted-foreground">{s.label}</div>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      <ProfileEditor user={user} />
+    </div>
   );
 }

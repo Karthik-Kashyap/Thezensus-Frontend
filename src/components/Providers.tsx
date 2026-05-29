@@ -1,13 +1,21 @@
 "use client";
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { ThemeProvider } from "next-themes";
+import { Toaster } from "sonner";
 import { useState } from "react";
 
-// React Query provider (DESIGN-001 §9 state management). staleTime 30s globally.
+/** App-wide client providers: server-state cache, theme (light/dark), toast host. */
 export function Providers({ children }: { children: React.ReactNode }) {
   const [client] = useState(
-    () => new QueryClient({ defaultOptions: { queries: { staleTime: 30_000 } } }),
+    () => new QueryClient({ defaultOptions: { queries: { staleTime: 30_000, retry: 1 } } }),
   );
-  // TODO(DESIGN §4.2): Amplify.configure(amplifyConfig) once Cognito env values exist.
-  return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
+  return (
+    <QueryClientProvider client={client}>
+      <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+        {children}
+        <Toaster position="bottom-right" richColors closeButton />
+      </ThemeProvider>
+    </QueryClientProvider>
+  );
 }

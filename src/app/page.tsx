@@ -1,15 +1,21 @@
-import { api } from "@/lib/api";
+"use client";
 
-// Home feed — ISR, 30s revalidation (DESIGN-001 §9).
-export const revalidate = 30;
+import { useSession } from "@/lib/session";
+import { Hero } from "@/components/home/Hero";
+import { HomeFeed } from "@/components/home/HomeFeed";
+import { Skeleton } from "@/components/ui/skeleton";
 
-export default async function HomePage() {
-  // TODO(DESIGN §9): const { polls } = await api.get("/polls?sort=trending&limit=20");
-  void api;
-  return (
-    <main>
-      <h1>Trending polls</h1>
-      {/* TODO(DESIGN §9): <PollFeed initialPolls={polls} /> */}
-    </main>
-  );
+export default function HomePage() {
+  const { user, isLoading } = useSession();
+
+  if (isLoading) {
+    return (
+      <div className="mx-auto max-w-2xl space-y-4">
+        <Skeleton className="h-10 w-1/2" />
+        <Skeleton className="h-40 w-full rounded-xl" />
+      </div>
+    );
+  }
+
+  return user ? <HomeFeed /> : <Hero />;
 }
