@@ -7,12 +7,13 @@ import { ProfileView } from "@/components/profile/ProfileView";
 export const dynamic = "force-dynamic";
 
 export default async function ProfilePage({ params }: { params: Promise<{ userId: string }> }) {
-  const { userId } = await params;
+  // The `[userId]` path segment is a linkId (ADR-006 pseudonym); the folder name is kept for URL stability.
+  const { userId: linkId } = await params;
 
   let profile: PublicProfile | null = null;
   let notFound = false;
   try {
-    profile = await getPublicProfile(userId);
+    profile = await getPublicProfile(linkId);
   } catch (e) {
     if ((e as { status?: number }).status === 404) notFound = true;
     else throw e;

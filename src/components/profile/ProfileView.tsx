@@ -7,6 +7,7 @@ import { relativeTime } from "@/lib/format";
 import { useSession } from "@/lib/session";
 import { UserAvatar } from "@/components/common/UserAvatar";
 import { FollowButton } from "./FollowButton";
+import { ReportButton } from "@/components/moderation/ReportDialog";
 import { PollFeed } from "@/components/poll/PollFeed";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -14,11 +15,11 @@ import { ComingSoon } from "@/components/common/ComingSoon";
 
 export function ProfileView({ profile }: { profile: PublicProfile }) {
   const { user } = useSession();
-  const isSelf = user?.userId === profile.userId;
+  const isSelf = user?.linkId === profile.linkId;
   const demo = profile.demographics;
   const demoLine =
-    demo && (demo.gender || demo.birthYear || demo.region)
-      ? [demo.gender?.replace(/_/g, " "), demo.birthYear, demo.region].filter(Boolean).join(" · ")
+    demo && (demo.gender || demo.region)
+      ? [demo.gender?.replace(/_/g, " "), demo.region].filter(Boolean).join(" · ")
       : null;
 
   return (
@@ -30,12 +31,19 @@ export function ProfileView({ profile }: { profile: PublicProfile }) {
             <UserAvatar
               name={profile.displayName}
               mediaId={profile.avatarMediaId}
-              ownerId={profile.userId}
+              ownerId={profile.linkId}
               mediaKey={profile.avatarKey}
               isSelf={isSelf}
               className="h-20 w-20 ring-4 ring-card shadow-md"
             />
-            {!isSelf && <FollowButton />}
+            {!isSelf && (
+              <div className="flex items-center gap-2">
+                <FollowButton />
+                {user && (
+                  <ReportButton targetType="USER" targetId={profile.linkId} label="Report user" />
+                )}
+              </div>
+            )}
           </div>
           <div>
             <h1 className="font-display text-2xl font-semibold tracking-tight">
@@ -63,8 +71,8 @@ export function ProfileView({ profile }: { profile: PublicProfile }) {
         </TabsList>
         <TabsContent value="polls">
           <PollFeed
-            queryKey={["creatorPolls", profile.userId]}
-            fetchPage={(cursor) => listCreatorPolls(profile.userId, { cursor })}
+            queryKey={["creatorPolls", profile.linkId]}
+            fetchPage={(cursor) => listCreatorPolls(profile.linkId, { cursor })}
             emptyTitle="No polls yet"
             emptyMessage={isSelf ? "Create your first poll to see it here." : "This user hasn’t posted any public polls."}
           />

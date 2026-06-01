@@ -5,14 +5,24 @@ import { useRouter } from "next/navigation";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { createCommunity, subscribe } from "@/lib/communities";
-import { VISIBILITY_OPTIONS, routes } from "@/lib/constants";
-import type { CreateCommunityInput, Visibility } from "@/lib/types";
+import { SEGMENT_LIMITS, VISIBILITY_OPTIONS, routes } from "@/lib/constants";
+import type { CreateCommunityInput, SegmentDef, Visibility } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { SegmentEditor } from "./SegmentEditor";
 import { cn } from "@/lib/utils";
+
+/** Trim a draft question and drop empty options. Used to decide which questions to keep + validate. */
+function cleanQuestion(q: SegmentDef): SegmentDef {
+  return {
+    id: q.id,
+    label: q.label.trim(),
+    options: q.options.map((o) => o.trim()).filter(Boolean),
+  };
+}
 
 export function CreateCommunityForm() {
   const router = useRouter();
@@ -20,6 +30,7 @@ export function CreateCommunityForm() {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [visibility, setVisibility] = useState<Visibility>("public");
+  const [segments, setSegments] = useState<SegmentDef[]>([]);
 
   const mutation = useMutation({
     // The backend treats OWNER (role) and member (subscription) as distinct, so we
@@ -45,10 +56,23 @@ export function CreateCommunityForm() {
   function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!name.trim()) return;
+
+    // Keep only questions the owner actually touched; each kept one must be complete.
+    const cleaned = segments
+      .map(cleanQuestion)
+      .filter((q) => q.label.length > 0 || q.options.length > 0);
+    for (const q of cleaned) {
+      if (!q.label || q.options.length < SEGMENT_LIMITS.optionsMin) {
+        toast.error(`Each member question needs a label and at least ${SEGMENT_LIMITS.optionsMin} options.`);
+        return;
+      }
+    }
+
     mutation.mutate({
       name: name.trim(),
       description: description.trim() || undefined,
       visibility,
+      segments: cleaned.length ? cleaned : undefined,
     });
   }
 
@@ -114,6 +138,19 @@ export function CreateCommunityForm() {
               </span>
             </button>
           ))}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Member questions</CardTitle>
+          <p className="text-sm text-muted-foreground">
+            Optional. Ask members a few questions when they join (e.g. class year, role) to slice
+            poll results later. These are set now and can’t be changed after the community is created.
+          </p>
+        </CardHeader>
+        <CardContent>
+          <SegmentEditor value={segments} onChange={setSegments} />
         </CardContent>
       </Card>
 

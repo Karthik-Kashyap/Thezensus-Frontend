@@ -3,6 +3,8 @@
 import { useSession } from "@/lib/session";
 import { relativeTime } from "@/lib/format";
 import { ProfileEditor } from "@/components/profile/ProfileEditor";
+import { ConsentSettings } from "@/components/profile/ConsentSettings";
+import { DangerZone } from "@/components/profile/DangerZone";
 import { AvatarUploader } from "@/components/profile/AvatarUploader";
 import { SignInGate } from "@/components/auth/SignInGate";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -25,7 +27,6 @@ export default function MyProfilePage() {
       <SignInGate
         title="Your profile"
         message="Sign in to view and edit your profile."
-        redirectTo="/me"
       />
     );
   }
@@ -62,6 +63,8 @@ export default function MyProfilePage() {
       </Card>
 
       <ProfileEditor user={user} />
+      <ConsentSettings />
+      <DangerZone />
     </div>
   );
 }

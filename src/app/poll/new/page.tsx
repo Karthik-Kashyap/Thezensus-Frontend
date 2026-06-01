@@ -17,7 +17,6 @@ function NewPollContent() {
       <SignInGate
         title="Create a poll"
         message="Sign in to ask the world a question."
-        redirectTo="/poll/new"
       />
     );
   }

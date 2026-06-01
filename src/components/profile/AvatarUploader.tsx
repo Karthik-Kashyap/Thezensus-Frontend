@@ -53,7 +53,7 @@ export function AvatarUploader({ user }: { user: MeProfile }) {
         key={version}
         name={user.displayName}
         mediaId={user.avatarMediaId}
-        ownerId={user.userId}
+        ownerId={user.linkId}
         mediaKey={user.avatarKey}
         isSelf
         className="h-20 w-20 ring-4 ring-card shadow-md"

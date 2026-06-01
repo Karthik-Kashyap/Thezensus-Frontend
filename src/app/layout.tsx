@@ -4,6 +4,7 @@ import "./globals.css";
 import { Providers } from "@/components/Providers";
 import { Nav } from "@/components/layout/Nav";
 import { Sidebar } from "@/components/layout/Sidebar";
+import { AccountGate } from "@/components/moderation/AccountGate";
 
 // Display: a warm optical serif — serious enough for orgs, friendly for social.
 const display = Fraunces({
@@ -34,7 +35,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <Nav />
             <div className="mx-auto flex w-full max-w-[1240px] gap-0">
               <Sidebar />
-              <main className="min-w-0 flex-1 px-4 py-8 sm:px-8">{children}</main>
+              <main className="min-w-0 flex-1 px-4 py-8 sm:px-8">
+                <AccountGate>{children}</AccountGate>
+              </main>
             </div>
           </div>
         </Providers>

@@ -60,7 +60,7 @@ export function CommentsSection({ pollId, token }: { pollId: string; token?: str
       ) : (
         <div className="flex items-center justify-between rounded-lg border border-dashed px-4 py-3 text-sm text-muted-foreground">
           <span>Sign in to join the discussion.</span>
-          <LoginDialog trigger={<Button size="sm" variant="outline">Sign in</Button>} redirectTo={`/poll/${pollId}`} />
+          <LoginDialog trigger={<Button size="sm" variant="outline">Sign in</Button>} />
         </div>
       )}
 
@@ -73,7 +73,9 @@ export function CommentsSection({ pollId, token }: { pollId: string; token?: str
         ) : comments.length === 0 ? (
           <p className="py-8 text-center text-sm text-muted-foreground">No comments yet. Start the conversation.</p>
         ) : (
-          comments.map((c) => <CommentItem key={c.commentId} comment={c} currentUserId={user?.userId} />)
+          comments.map((c) => (
+            <CommentItem key={c.commentId} comment={c} currentUserId={user?.linkId} canReport={!!user} />
+          ))
         )}
       </div>
 

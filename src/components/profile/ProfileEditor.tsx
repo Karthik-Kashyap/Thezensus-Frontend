@@ -17,7 +17,6 @@ interface FormState {
   displayName: string;
   bio: string;
   gender: string;
-  birthYear: string;
   region: string;
   demographicsPublic: boolean;
   notifPrefs: string[];
@@ -61,7 +60,6 @@ export function ProfileEditor({ user }: { user: MeProfile }) {
     };
     if (form.displayName.trim()) input.displayName = form.displayName.trim();
     if (form.gender) input.gender = form.gender;
-    if (form.birthYear) input.birthYear = Number(form.birthYear);
     mutation.mutate(input);
   }
 
@@ -97,11 +95,12 @@ export function ProfileEditor({ user }: { user: MeProfile }) {
         <CardHeader>
           <CardTitle>Demographics</CardTitle>
           <p className="text-sm text-muted-foreground">
-            Used for poll analytics. Hidden from others unless you opt in below.
+            Powers poll analytics only when you enable demographic consent under Privacy &amp; consent
+            below. Hidden from your public profile unless you opt in here.
           </p>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid gap-4 sm:grid-cols-3">
+          <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Gender" htmlFor="gender">
               <Select id="gender" value={form.gender} onChange={(e) => set("gender", e.target.value)}>
                 <option value="">Prefer not to say</option>
@@ -111,16 +110,6 @@ export function ProfileEditor({ user }: { user: MeProfile }) {
                   </option>
                 ))}
               </Select>
-            </Field>
-            <Field label="Birth year" htmlFor="birthYear">
-              <Input
-                id="birthYear"
-                type="number"
-                min={1900}
-                max={new Date().getFullYear()}
-                value={form.birthYear}
-                onChange={(e) => set("birthYear", e.target.value)}
-              />
             </Field>
             <Field label="Region" htmlFor="region">
               <Input
@@ -132,6 +121,12 @@ export function ProfileEditor({ user }: { user: MeProfile }) {
               />
             </Field>
           </div>
+          {user.demographics.age != null && (
+            <p className="text-sm text-muted-foreground">
+              Age: <span className="font-medium text-foreground">{user.demographics.age}</span>{" "}
+              <span className="text-xs">— set from your date of birth at sign-up and not editable.</span>
+            </p>
+          )}
           <Toggle
             checked={form.demographicsPublic}
             onChange={(v) => set("demographicsPublic", v)}
@@ -170,7 +165,6 @@ function fromProfile(me: MeProfile): FormState {
     displayName: me.displayName ?? "",
     bio: me.bio ?? "",
     gender: me.demographics.gender ?? "",
-    birthYear: me.demographics.birthYear ? String(me.demographics.birthYear) : "",
     region: me.demographics.region ?? "",
     demographicsPublic: me.demographics.demographicsPublic,
     notifPrefs: me.settings.notifPrefs ?? [],

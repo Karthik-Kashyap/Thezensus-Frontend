@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { LogOut, User, BarChart3 } from "lucide-react";
+import { LogOut, User, BarChart3, ShieldCheck } from "lucide-react";
 import { logout } from "@/lib/auth";
 import { routes } from "@/lib/constants";
 import type { MeProfile } from "@/lib/types";
@@ -38,7 +38,7 @@ export function UserMenu({ user }: { user: MeProfile }) {
         <UserAvatar
           name={user.displayName}
           mediaId={user.avatarMediaId}
-          ownerId={user.userId}
+          ownerId={user.linkId}
           mediaKey={user.avatarKey}
           isSelf
           className="h-9 w-9 ring-2 ring-border transition hover:ring-primary/40"
@@ -56,10 +56,20 @@ export function UserMenu({ user }: { user: MeProfile }) {
           </Link>
         </DropdownMenuItem>
         <DropdownMenuItem asChild>
-          <Link href={routes.profile(user.userId)}>
+          <Link href={routes.profile(user.linkId)}>
             <BarChart3 /> My polls
           </Link>
         </DropdownMenuItem>
+        {user.isAdmin && (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem asChild>
+              <Link href={routes.admin}>
+                <ShieldCheck /> Moderation
+              </Link>
+            </DropdownMenuItem>
+          </>
+        )}
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={handleLogout} className="text-destructive focus:text-destructive">
           <LogOut /> Sign out

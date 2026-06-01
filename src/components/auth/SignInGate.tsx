@@ -8,11 +8,9 @@ import { LoginDialog } from "./LoginDialog";
 export function SignInGate({
   title = "Sign in to continue",
   message = "You need an account to do this.",
-  redirectTo,
 }: {
   title?: string;
   message?: string;
-  redirectTo?: string;
 }) {
   return (
     <div className="mx-auto flex max-w-md flex-col items-center gap-4 py-20 text-center">
@@ -21,7 +19,7 @@ export function SignInGate({
       </div>
       <h1 className="font-display text-2xl font-semibold tracking-tight">{title}</h1>
       <p className="text-muted-foreground">{message}</p>
-      <LoginDialog trigger={<Button size="lg">Sign in</Button>} redirectTo={redirectTo} />
+      <LoginDialog trigger={<Button size="lg">Sign in</Button>} />
     </div>
   );
 }

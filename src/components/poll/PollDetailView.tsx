@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
-import { Repeat } from "lucide-react";
+import { Repeat, EyeOff } from "lucide-react";
 import { getPoll } from "@/lib/polls";
 import { getCommunity } from "@/lib/communities";
 import { useSession } from "@/lib/session";
@@ -15,6 +15,7 @@ import { VotePanel } from "./VotePanel";
 import { ShareButton } from "./ShareButton";
 import { AnalyticsStub } from "./AnalyticsStub";
 import { CommentsSection } from "@/components/comment/CommentsSection";
+import { ReportButton } from "@/components/moderation/ReportDialog";
 
 export function PollDetailView({ pollId, token }: { pollId: string; token?: string }) {
   const { user } = useSession();
@@ -53,7 +54,7 @@ export function PollDetailView({ pollId, token }: { pollId: string; token?: stri
     );
   }
 
-  const isCreator = user?.userId === poll.creatorId;
+  const isCreator = user?.linkId === poll.creatorId;
 
   return (
     <div className="mx-auto max-w-2xl">
@@ -77,9 +78,23 @@ export function PollDetailView({ pollId, token }: { pollId: string; token?: stri
           </Badge>
         )}
         {poll.status === "CLOSED" && <Badge variant="outline">Closed</Badge>}
-        <div className="ml-auto flex gap-2">
+        {poll.ballotMode === "anonymous" && (
+          <Badge variant="outline" className="gap-1">
+            <EyeOff className="h-3 w-3" /> Anonymous
+          </Badge>
+        )}
+        <div className="ml-auto flex items-center gap-2">
           {(poll.audienceType === "LINK" || poll.shareToken) && (
             <ShareButton pollId={poll.pollId} token={poll.shareToken ?? token} />
+          )}
+          {user && !isCreator && (
+            <ReportButton
+              targetType="POLL"
+              targetId={poll.pollId}
+              communityId={poll.communityId}
+              label="Report"
+              variant="inline"
+            />
           )}
         </div>
       </div>

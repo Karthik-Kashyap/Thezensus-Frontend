@@ -11,14 +11,17 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ComingSoon } from "@/components/common/ComingSoon";
 import { UserAvatar } from "@/components/common/UserAvatar";
+import { ReportButton } from "@/components/moderation/ReportDialog";
 
-/** A single comment. Author can edit/delete their own; vote arrows are a labeled stub. */
+/** A single comment. Author can edit/delete their own; others can report it; vote arrows are a stub. */
 export function CommentItem({
   comment,
   currentUserId,
+  canReport = false,
 }: {
   comment: Comment;
   currentUserId?: string;
+  canReport?: boolean;
 }) {
   const queryClient = useQueryClient();
   const [editing, setEditing] = useState(false);
@@ -88,18 +91,30 @@ export function CommentItem({
           <p className="mt-1 whitespace-pre-wrap text-[15px] leading-relaxed">{comment.text}</p>
         )}
 
-        {isAuthor && !editing && (
+        {!editing && (isAuthor || (canReport && !isAuthor)) && (
           <div className="mt-1.5 flex gap-3 text-xs text-muted-foreground">
-            <button className="inline-flex items-center gap-1 hover:text-foreground" onClick={() => setEditing(true)}>
-              <Pencil className="h-3 w-3" /> Edit
-            </button>
-            <button
-              className="inline-flex items-center gap-1 hover:text-destructive"
-              onClick={() => remove.mutate()}
-              disabled={remove.isPending}
-            >
-              <Trash2 className="h-3 w-3" /> Delete
-            </button>
+            {isAuthor && (
+              <>
+                <button className="inline-flex items-center gap-1 hover:text-foreground" onClick={() => setEditing(true)}>
+                  <Pencil className="h-3 w-3" /> Edit
+                </button>
+                <button
+                  className="inline-flex items-center gap-1 hover:text-destructive"
+                  onClick={() => remove.mutate()}
+                  disabled={remove.isPending}
+                >
+                  <Trash2 className="h-3 w-3" /> Delete
+                </button>
+              </>
+            )}
+            {canReport && !isAuthor && (
+              <ReportButton
+                targetType="COMMENT"
+                targetId={comment.commentId}
+                label="Report"
+                variant="inline"
+              />
+            )}
           </div>
         )}
       </div>

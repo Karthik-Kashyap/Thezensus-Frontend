@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 interface UserAvatarProps {
   name?: string | null;
   mediaId?: string | null;
-  /** The media owner id (= userId for avatars). Required to presign own media locally. */
+  /** The media owner id (= linkId for avatars). Required to presign own media locally. */
   ownerId?: string | null;
   mediaKey?: string | null;
   /** True when this is the signed-in user's own avatar (enables local presign). */

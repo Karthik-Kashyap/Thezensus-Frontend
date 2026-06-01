@@ -4,11 +4,11 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Plus, X, Link2, Users } from "lucide-react";
+import { Plus, X, Link2, Users, BarChart3, EyeOff } from "lucide-react";
 import { createPoll } from "@/lib/polls";
 import { listMySubscriptions, getCommunity } from "@/lib/communities";
 import { routes } from "@/lib/constants";
-import type { AudienceType, CreatePollInput, PollType } from "@/lib/types";
+import type { AudienceType, BallotMode, CreatePollInput, PollType } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -28,6 +28,7 @@ export function CreatePollForm({ initialCommunityId }: { initialCommunityId?: st
   const [communityId, setCommunityId] = useState(initialCommunityId ?? "");
   const [question, setQuestion] = useState("");
   const [type, setType] = useState<PollType>("binary");
+  const [ballotMode, setBallotMode] = useState<BallotMode>("standard");
   const [options, setOptions] = useState([
     { key: "o-a", label: "" },
     { key: "o-b", label: "" },
@@ -71,6 +72,7 @@ export function CreatePollForm({ initialCommunityId }: { initialCommunityId?: st
       communityId: audience === "COMMUNITY" ? communityId : undefined,
       question: question.trim(),
       type,
+      ballotMode,
       options: options
         .filter((o) => o.label.trim())
         .map((o, i) => ({ id: `opt_${i}`, label: o.label.trim() })),
@@ -182,6 +184,33 @@ export function CreatePollForm({ initialCommunityId }: { initialCommunityId?: st
                 <Plus className="h-4 w-4" /> Add option
               </Button>
             )}
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Ballot privacy</CardTitle>
+          <p className="text-sm text-muted-foreground">
+            This can’t be changed after you publish.
+          </p>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <AudienceCard
+              active={ballotMode === "standard"}
+              onClick={() => setBallotMode("standard")}
+              icon={BarChart3}
+              title="Standard"
+              hint="Attributable votes — powers demographic analytics."
+            />
+            <AudienceCard
+              active={ballotMode === "anonymous"}
+              onClick={() => setBallotMode("anonymous")}
+              icon={EyeOff}
+              title="Anonymous"
+              hint="Unlinkable votes — no analytics, and votes can’t be changed."
+            />
           </div>
         </CardContent>
       </Card>

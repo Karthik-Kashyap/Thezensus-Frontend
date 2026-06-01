@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Globe, Lock, Shield, Plus, Users } from "lucide-react";
+import { Globe, Lock, Shield, Plus, Settings, Users } from "lucide-react";
 import type { Community, Visibility } from "@/lib/types";
 import { routes } from "@/lib/constants";
 import { compactNumber } from "@/lib/format";
@@ -38,12 +38,23 @@ export function CommunityHeader({ community }: { community: Community }) {
             )}
           </div>
           <div className="flex items-center gap-2 pb-1">
+            {community.myRole && (
+              <Button asChild variant="outline" size="icon" title="Manage community">
+                <Link href={routes.communityManage(community.communityId)} aria-label="Manage community">
+                  <Settings className="h-4 w-4" />
+                </Link>
+              </Button>
+            )}
             <Button asChild variant="outline">
               <Link href={routes.newPoll(community.communityId)}>
                 <Plus className="h-4 w-4" /> New poll
               </Link>
             </Button>
-            <SubscribeButton communityId={community.communityId} />
+            <SubscribeButton
+              communityId={community.communityId}
+              communityName={community.name}
+              segments={community.segments}
+            />
           </div>
         </div>
 

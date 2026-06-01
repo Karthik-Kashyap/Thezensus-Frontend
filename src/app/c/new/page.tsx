@@ -14,7 +14,6 @@ export default function NewCommunityPage() {
       <SignInGate
         title="Create a community"
         message="Sign in to start a community."
-        redirectTo="/c/new"
       />
     );
   }

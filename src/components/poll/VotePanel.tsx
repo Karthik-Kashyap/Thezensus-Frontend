@@ -21,21 +21,25 @@ export function VotePanel({ poll, token }: { poll: Poll; token?: string }) {
   const { user } = useSession();
   const queryClient = useQueryClient();
   const [changing, setChanging] = useState(false);
+  // Anonymous polls aren't keyed by linkId, so the server can't tell us "your vote" — we remember
+  // the just-cast option locally so the UI can still confirm + show results.
+  const [justVotedId, setJustVotedId] = useState<string | null>(null);
 
   const edition = poll.currentEdition;
   const open = poll.status === "ACTIVE" && edition.status === "OPEN" && edition.windowState !== "ENDED";
+  const isAnonymous = poll.ballotMode === "anonymous";
   const isLink = poll.audienceType === "LINK";
   const guestAllowed = isLink && !poll.requireLoginToVote;
   const canInteract = open && (!!user || guestAllowed);
   const mustSignIn = open && !user && !guestAllowed;
 
-  // The user's existing vote on this edition (read-your-write).
+  // The user's existing vote on this edition (read-your-write) — null for anonymous/guest polls.
   const { data: myVote } = useQuery({
     queryKey: ["myVote", poll.pollId, token ?? null],
     queryFn: () => getMyVote(poll.pollId, token),
-    enabled: !!user || !!token,
+    enabled: (!!user || !!token) && !isAnonymous,
   });
-  const selectedId = myVote?.vote?.optionId ?? null;
+  const selectedId = myVote?.vote?.optionId ?? justVotedId;
   const hasVoted = !!selectedId;
 
   function refresh() {
@@ -47,6 +51,7 @@ export function VotePanel({ poll, token }: { poll: Poll; token?: string }) {
     mutationFn: (optionId: string) => castVote({ pollId: poll.pollId, optionId, token }),
     onSuccess: (r) => {
       if (r.status === "alreadyVoted") toast.info("You’ve already voted on this one.");
+      setJustVotedId(r.optionId);
       refresh();
     },
     onError: (e) => {
@@ -79,11 +84,12 @@ export function VotePanel({ poll, token }: { poll: Poll; token?: string }) {
           />
           <div className="flex items-center justify-between text-sm text-muted-foreground">
             <span>{edition.voteCount.toLocaleString()} votes</span>
-            {hasVoted && open && user && (
+            {hasVoted && open && user && !isAnonymous && (
               <button className="font-medium text-primary hover:underline" onClick={() => setChanging(true)}>
                 Change my vote
               </button>
             )}
+            {hasVoted && isAnonymous && <span>Anonymous vote recorded</span>}
             {!open && <span>Voting closed</span>}
           </div>
         </>
@@ -91,7 +97,7 @@ export function VotePanel({ poll, token }: { poll: Poll; token?: string }) {
         <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed py-8 text-center">
           <Lock className="h-6 w-6 text-muted-foreground" />
           <p className="text-sm text-muted-foreground">Sign in to cast your vote.</p>
-          <LoginDialog trigger={<Button>Sign in to vote</Button>} redirectTo={`/poll/${poll.pollId}`} />
+          <LoginDialog trigger={<Button>Sign in to vote</Button>} />
         </div>
       ) : (
         <div className="space-y-2.5">

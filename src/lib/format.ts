@@ -22,6 +22,12 @@ export function relativeTime(iso?: string): string {
   return new Date(iso).toLocaleDateString();
 }
 
+/** Absolute local date + time, e.g. "May 31, 2026, 4:05 PM" — for audit logs / precise stamps. */
+export function dateTime(iso?: string): string {
+  if (!iso) return "";
+  return new Date(iso).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+}
+
 /** Vote count → "1.2k" style compaction. */
 export function compactNumber(n: number): string {
   if (n < 1000) return String(n);
