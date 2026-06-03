@@ -1,10 +1,11 @@
 "use client";
 
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { useQueries, useQuery } from "@tanstack/react-query";
-import { Flame, Plus, Compass } from "lucide-react";
+import { Plus, Compass } from "lucide-react";
 import { listMySubscriptions } from "@/lib/communities";
-import { listCommunityPolls } from "@/lib/polls";
+import { listCommunityPolls, listDiscoverPolls } from "@/lib/polls";
 import { routes } from "@/lib/constants";
 import type { PollListItem } from "@/lib/types";
 import { PollCard } from "@/components/poll/PollCard";
@@ -12,8 +13,11 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 
 /**
- * Logged-in home: a blended feed of the newest polls across the communities you've joined.
- * (A ranked global "trending" feed is a separate BRD feature with no backend yet — see the banner.)
+ * Logged-in home — two stacked feeds:
+ *  • "Your feed" — newest polls across communities you've joined (subscription pull). Hidden until
+ *    you've joined a community that has polls.
+ *  • "Discover"  — public polls from across the platform (poll-service GET /polls/discover, swappable
+ *    ranking — recency for now). This is what fills the page before you've joined anything.
  */
 export function HomeFeed() {
   const { data: subs, isLoading: subsLoading } = useQuery({
@@ -30,16 +34,31 @@ export function HomeFeed() {
     })),
   });
 
-  const loading = subsLoading || pollQueries.some((q) => q.isLoading);
+  const { data: discover, isLoading: discoverLoading } = useQuery({
+    queryKey: ["discoverPolls", "home"],
+    queryFn: () => listDiscoverPolls({ limit: 25 }),
+  });
 
-  const polls: PollListItem[] = pollQueries
+  const yourFeedLoading = subsLoading || pollQueries.some((q) => q.isLoading);
+
+  const myPolls: PollListItem[] = pollQueries
     .flatMap((q) => q.data?.items ?? [])
     .sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt));
 
+  // Discover = global public polls, minus anything already shown in "Your feed" (no duplicates).
+  const seen = new Set(myPolls.map((p) => p.pollId));
+  const discoverPolls = (discover?.items ?? []).filter((p) => !seen.has(p.pollId));
+
+  const nothingToShow =
+    !yourFeedLoading &&
+    !discoverLoading &&
+    myPolls.length === 0 &&
+    discoverPolls.length === 0;
+
   return (
-    <div className="mx-auto max-w-2xl space-y-6">
+    <div className="mx-auto max-w-2xl space-y-10">
       <div className="flex items-center justify-between">
-        <h1 className="font-display text-3xl font-semibold tracking-tight">Your feed</h1>
+        <h1 className="font-display text-3xl font-semibold tracking-tight">Home</h1>
         <Button asChild size="sm">
           <Link href={routes.newPoll()}>
             <Plus className="h-4 w-4" /> Create
@@ -47,34 +66,65 @@ export function HomeFeed() {
         </Button>
       </div>
 
-      <div className="flex items-center gap-3 rounded-xl border border-dashed bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
-        <Flame className="h-4 w-4 shrink-0 text-secondary" />
-        <span>A global <strong className="font-semibold text-foreground">Trending</strong> feed is coming soon. For now, this shows polls from your communities.</span>
-      </div>
-
-      {loading ? (
-        <div className="space-y-4">
-          <Skeleton className="h-40 w-full rounded-xl" />
-          <Skeleton className="h-40 w-full rounded-xl" />
-        </div>
-      ) : communityIds.length === 0 ? (
-        <EmptyState
-          title="Join a community to fill your feed"
-          body="Communities are where polls live. Create your own, or start one for your org."
-        />
-      ) : polls.length === 0 ? (
-        <EmptyState
-          title="No polls yet"
-          body="The communities you’ve joined haven’t posted anything. Be the first."
-        />
-      ) : (
-        <div className="space-y-4">
-          {polls.map((poll) => (
+      {/* Your feed — only once you've joined communities that have posted polls. */}
+      {yourFeedLoading ? (
+        <FeedSkeleton title="Your feed" />
+      ) : myPolls.length > 0 ? (
+        <FeedSection title="Your feed" subtitle="Newest polls from communities you’ve joined.">
+          {myPolls.map((poll) => (
             <PollCard key={poll.pollId} poll={poll} />
           ))}
-        </div>
-      )}
+        </FeedSection>
+      ) : null}
+
+      {/* Discover — public polls from across the platform. */}
+      {discoverLoading ? (
+        <FeedSkeleton title="Discover" />
+      ) : discoverPolls.length > 0 ? (
+        <FeedSection title="Discover" subtitle="Public polls from across Thezensus.">
+          {discoverPolls.map((poll) => (
+            <PollCard key={poll.pollId} poll={poll} />
+          ))}
+        </FeedSection>
+      ) : null}
+
+      {nothingToShow ? (
+        <EmptyState
+          title="Nothing here yet"
+          body="There are no public polls to show. Create the first one, or start a community."
+        />
+      ) : null}
     </div>
+  );
+}
+
+function FeedSection({
+  title,
+  subtitle,
+  children,
+}: {
+  title: string;
+  subtitle?: string;
+  children: ReactNode;
+}) {
+  return (
+    <section className="space-y-4">
+      <div>
+        <h2 className="font-display text-xl font-semibold tracking-tight">{title}</h2>
+        {subtitle ? <p className="text-sm text-muted-foreground">{subtitle}</p> : null}
+      </div>
+      <div className="space-y-4">{children}</div>
+    </section>
+  );
+}
+
+function FeedSkeleton({ title }: { title: string }) {
+  return (
+    <section className="space-y-4">
+      <h2 className="font-display text-xl font-semibold tracking-tight">{title}</h2>
+      <Skeleton className="h-40 w-full rounded-xl" />
+      <Skeleton className="h-40 w-full rounded-xl" />
+    </section>
   );
 }
 

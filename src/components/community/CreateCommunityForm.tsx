@@ -5,15 +5,16 @@ import { useRouter } from "next/navigation";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { createCommunity, subscribe } from "@/lib/communities";
-import { SEGMENT_LIMITS, VISIBILITY_OPTIONS, routes } from "@/lib/constants";
+import { SEGMENT_LIMITS, routes } from "@/lib/constants";
 import type { CreateCommunityInput, SegmentDef, Visibility } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Stepper, type Step } from "@/components/ui/stepper";
 import { SegmentEditor } from "./SegmentEditor";
-import { cn } from "@/lib/utils";
+import { VisibilityField } from "./VisibilityField";
 
 /** Trim a draft question and drop empty options. Used to decide which questions to keep + validate. */
 function cleanQuestion(q: SegmentDef): SegmentDef {
@@ -76,87 +77,91 @@ export function CreateCommunityForm() {
     });
   }
 
+  // Progress rail state. "Who can join?" always has a value (defaults to public), so it's
+  // satisfied from the start; member questions are optional, so they show amber until filled.
+  const steps: Step[] = [
+    {
+      id: "details",
+      label: "Community details",
+      description: "Name your community",
+      status: name.trim() ? "complete" : "incomplete",
+    },
+    {
+      id: "audience",
+      label: "Who can join?",
+      description: "Choose visibility",
+      status: "complete",
+    },
+    {
+      id: "questions",
+      label: "Member questions",
+      description: "Optional",
+      status: segments.some((s) => s.label.trim().length > 0) ? "complete" : "optional",
+    },
+  ];
+
   return (
-    <form onSubmit={onSubmit} className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>Community details</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-1.5">
-            <Label htmlFor="name">Name</Label>
-            <Input
-              id="name"
-              placeholder="e.g. Stanford CS, r/CoffeeLovers, Acme Inc."
-              maxLength={80}
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              required
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="description">Description</Label>
-            <Textarea
-              id="description"
-              placeholder="What is this community about?"
-              maxLength={500}
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-            />
-          </div>
-        </CardContent>
-      </Card>
+    <div className="flex gap-8 lg:gap-12">
+      <aside className="sticky top-24 hidden h-fit w-44 shrink-0 self-start lg:block">
+        <Stepper steps={steps} />
+      </aside>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Who can join?</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {VISIBILITY_OPTIONS.map((opt) => (
-            <button
-              type="button"
-              key={opt.value}
-              onClick={() => setVisibility(opt.value)}
-              className={cn(
-                "flex w-full items-start gap-3 rounded-lg border p-4 text-left transition",
-                visibility === opt.value
-                  ? "border-primary bg-accent"
-                  : "border-border hover:border-primary/40",
-              )}
-            >
-              <span
-                className={cn(
-                  "mt-0.5 grid h-4 w-4 shrink-0 place-items-center rounded-full border-2",
-                  visibility === opt.value ? "border-primary" : "border-muted-foreground/40",
-                )}
-              >
-                {visibility === opt.value && <span className="h-2 w-2 rounded-full bg-primary" />}
-              </span>
-              <span>
-                <span className="block font-medium">{opt.label}</span>
-                <span className="block text-sm text-muted-foreground">{opt.hint}</span>
-              </span>
-            </button>
-          ))}
-        </CardContent>
-      </Card>
+      <form onSubmit={onSubmit} className="min-w-0 flex-1 space-y-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>Community details</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="name">Name</Label>
+              <Input
+                id="name"
+                placeholder="e.g. Stanford CS, r/CoffeeLovers, Acme Inc."
+                maxLength={80}
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                required
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="description">Description</Label>
+              <Textarea
+                id="description"
+                placeholder="What is this community about?"
+                maxLength={500}
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+              />
+            </div>
+          </CardContent>
+        </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Member questions</CardTitle>
-          <p className="text-sm text-muted-foreground">
-            Optional. Ask members a few questions when they join (e.g. class year, role) to slice
-            poll results later. These are set now and can’t be changed after the community is created.
-          </p>
-        </CardHeader>
-        <CardContent>
-          <SegmentEditor value={segments} onChange={setSegments} />
-        </CardContent>
-      </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle>Who can join?</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <VisibilityField value={visibility} onChange={setVisibility} />
+          </CardContent>
+        </Card>
 
-      <Button type="submit" size="lg" disabled={mutation.isPending}>
-        {mutation.isPending ? "Creating…" : "Create community"}
-      </Button>
-    </form>
+        <Card>
+          <CardHeader>
+            <CardTitle>Member questions</CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Optional. Ask members a few questions when they join (e.g. class year, role) to slice
+              poll results later. These are set now and can’t be changed after the community is created.
+            </p>
+          </CardHeader>
+          <CardContent>
+            <SegmentEditor value={segments} onChange={setSegments} />
+          </CardContent>
+        </Card>
+
+        <Button type="submit" size="lg" disabled={mutation.isPending}>
+          {mutation.isPending ? "Creating…" : "Create community"}
+        </Button>
+      </form>
+    </div>
   );
 }

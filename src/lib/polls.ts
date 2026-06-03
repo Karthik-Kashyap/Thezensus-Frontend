@@ -19,6 +19,19 @@ export const deletePoll = (id: string) => api.del<void>(`/polls/${encodeURICompo
 export const listCommunityPolls = (communityId: string, opts?: { limit?: number; cursor?: string }) =>
   listPolls({ communityId, ...opts });
 
+/**
+ * Global discovery feed — public polls from across the platform, independent of what you've joined
+ * (poll-service GET /polls/discover). The backend ranking is swappable (recency for now); the client
+ * just consumes the same {items,nextCursor} page envelope as the other feeds.
+ */
+export const listDiscoverPolls = (opts?: { limit?: number; cursor?: string }) => {
+  const q = new URLSearchParams();
+  if (opts?.limit) q.set("limit", String(opts.limit));
+  if (opts?.cursor) q.set("cursor", opts.cursor);
+  const qs = q.toString();
+  return api.get<Page<PollListItem>>(`/polls/discover${qs ? `?${qs}` : ""}`);
+};
+
 /** A creator's polls (drives profile poll lists). */
 export const listCreatorPolls = (creatorId: string, opts?: { limit?: number; cursor?: string }) =>
   listPolls({ creatorId, ...opts });

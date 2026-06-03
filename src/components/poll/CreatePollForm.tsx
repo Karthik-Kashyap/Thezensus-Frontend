@@ -15,6 +15,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Stepper, type Step } from "@/components/ui/stepper";
 import { cn } from "@/lib/utils";
 
 let optionSeq = 0;
@@ -81,144 +82,175 @@ export function CreatePollForm({ initialCommunityId }: { initialCommunityId?: st
 
   const canRemove = type === "multi" && options.length > 2;
 
+  // Progress rail state. Destination + question are required; ballot privacy always has a
+  // value (defaults to standard), so it reads as satisfied from the start.
+  const destinationDone = audience === "LINK" || (audience === "COMMUNITY" && Boolean(communityId));
+  const filledOptions = options.filter((o) => o.label.trim()).length;
+  const steps: Step[] = [
+    {
+      id: "destination",
+      label: "Where it goes",
+      description: "Community or link",
+      status: destinationDone ? "complete" : "incomplete",
+    },
+    {
+      id: "question",
+      label: "Your question",
+      description: "Question & options",
+      status: question.trim() && filledOptions >= 2 ? "complete" : "incomplete",
+    },
+    {
+      id: "privacy",
+      label: "Ballot privacy",
+      description: "Standard or anonymous",
+      status: "complete",
+    },
+  ];
+
   return (
-    <form onSubmit={onSubmit} className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>Where should this go?</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid gap-3 sm:grid-cols-2">
-            <AudienceCard
-              active={audience === "COMMUNITY"}
-              onClick={() => setAudience("COMMUNITY")}
-              icon={Users}
-              title="A community"
-              hint="Post to members of a community."
-            />
-            <AudienceCard
-              active={audience === "LINK"}
-              onClick={() => setAudience("LINK")}
-              icon={Link2}
-              title="Share by link"
-              hint="Anyone with the link can vote."
-            />
-          </div>
+    <div className="flex gap-8 lg:gap-12">
+      <aside className="sticky top-24 hidden h-fit w-44 shrink-0 self-start lg:block">
+        <Stepper steps={steps} />
+      </aside>
 
-          {audience === "COMMUNITY" && (
-            <div className="space-y-1.5">
-              <Label htmlFor="community">Community</Label>
-              <Select
-                id="community"
-                value={communityId}
-                onChange={(e) => setCommunityId(e.target.value)}
-                required
-              >
-                <option value="">Select a community…</option>
-                {subs?.map((s) => <CommunityOption key={s.communityId} id={s.communityId} />)}
-              </Select>
-              {subs && subs.length === 0 && (
-                <p className="text-sm text-muted-foreground">
-                  You haven’t joined any communities yet.{" "}
-                  <a href={routes.newCommunity} className="text-primary underline">
-                    Create one
-                  </a>
-                  .
-                </p>
-              )}
+      <form onSubmit={onSubmit} className="min-w-0 flex-1 space-y-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>Where should this go?</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <AudienceCard
+                active={audience === "COMMUNITY"}
+                onClick={() => setAudience("COMMUNITY")}
+                icon={Users}
+                title="A community"
+                hint="Post to members of a community."
+              />
+              <AudienceCard
+                active={audience === "LINK"}
+                onClick={() => setAudience("LINK")}
+                icon={Link2}
+                title="Share by link"
+                hint="Anyone with the link can vote."
+              />
             </div>
-          )}
-        </CardContent>
-      </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Your question</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <Textarea
-            placeholder="Ask anything…"
-            value={question}
-            maxLength={300}
-            rows={2}
-            onChange={(e) => setQuestion(e.target.value)}
-            className="font-display text-lg"
-          />
-
-          <div className="flex gap-2">
-            <TypeChip active={type === "binary"} onClick={() => setType_("binary")} label="Yes / No" />
-            <TypeChip active={type === "multi"} onClick={() => setType_("multi")} label="Multiple choice" />
-          </div>
-
-          <div className="space-y-2">
-            {options.map((o, i) => (
-              <div key={o.key} className="flex items-center gap-2">
-                <span className="grid h-8 w-8 shrink-0 place-items-center rounded-md bg-muted text-xs font-semibold text-muted-foreground">
-                  {String.fromCharCode(65 + i)}
-                </span>
-                <Input
-                  placeholder={`Option ${i + 1}`}
-                  value={o.label}
-                  maxLength={120}
-                  onChange={(e) => updateOption(o.key, e.target.value)}
-                />
-                {canRemove && (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => setOptions((os) => os.filter((x) => x.key !== o.key))}
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
+            {audience === "COMMUNITY" && (
+              <div className="space-y-1.5">
+                <Label htmlFor="community">Community</Label>
+                <Select
+                  id="community"
+                  value={communityId}
+                  onChange={(e) => setCommunityId(e.target.value)}
+                  required
+                >
+                  <option value="">Select a community…</option>
+                  {subs?.map((s) => <CommunityOption key={s.communityId} id={s.communityId} />)}
+                </Select>
+                {subs && subs.length === 0 && (
+                  <p className="text-sm text-muted-foreground">
+                    You haven’t joined any communities yet.{" "}
+                    <a href={routes.newCommunity} className="text-primary underline">
+                      Create one
+                    </a>
+                    .
+                  </p>
                 )}
               </div>
-            ))}
-            {type === "multi" && (
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={() => setOptions((os) => [...os, newOption()])}
-              >
-                <Plus className="h-4 w-4" /> Add option
-              </Button>
             )}
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Ballot privacy</CardTitle>
-          <p className="text-sm text-muted-foreground">
-            This can’t be changed after you publish.
-          </p>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <AudienceCard
-              active={ballotMode === "standard"}
-              onClick={() => setBallotMode("standard")}
-              icon={BarChart3}
-              title="Standard"
-              hint="Attributable votes — powers demographic analytics."
+        <Card>
+          <CardHeader>
+            <CardTitle>Your question</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Textarea
+              placeholder="Ask anything…"
+              value={question}
+              maxLength={300}
+              rows={2}
+              onChange={(e) => setQuestion(e.target.value)}
+              className="font-display text-lg"
             />
-            <AudienceCard
-              active={ballotMode === "anonymous"}
-              onClick={() => setBallotMode("anonymous")}
-              icon={EyeOff}
-              title="Anonymous"
-              hint="Unlinkable votes — no analytics, and votes can’t be changed."
-            />
-          </div>
-        </CardContent>
-      </Card>
 
-      <Button type="submit" size="lg" disabled={mutation.isPending}>
-        {mutation.isPending ? "Publishing…" : "Publish poll"}
-      </Button>
-    </form>
+            <div className="flex gap-2">
+              <TypeChip active={type === "binary"} onClick={() => setType_("binary")} label="Yes / No" />
+              <TypeChip active={type === "multi"} onClick={() => setType_("multi")} label="Multiple choice" />
+            </div>
+
+            <div className="space-y-2">
+              {options.map((o, i) => (
+                <div key={o.key} className="flex items-center gap-2">
+                  <span className="grid h-8 w-8 shrink-0 place-items-center rounded-md bg-muted text-xs font-semibold text-muted-foreground">
+                    {String.fromCharCode(65 + i)}
+                  </span>
+                  <Input
+                    placeholder={`Option ${i + 1}`}
+                    value={o.label}
+                    maxLength={120}
+                    onChange={(e) => updateOption(o.key, e.target.value)}
+                  />
+                  {canRemove && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => setOptions((os) => os.filter((x) => x.key !== o.key))}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+              ))}
+              {type === "multi" && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setOptions((os) => [...os, newOption()])}
+                >
+                  <Plus className="h-4 w-4" /> Add option
+                </Button>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Ballot privacy</CardTitle>
+            <p className="text-sm text-muted-foreground">
+              This can’t be changed after you publish.
+            </p>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <AudienceCard
+                active={ballotMode === "standard"}
+                onClick={() => setBallotMode("standard")}
+                icon={BarChart3}
+                title="Standard"
+                hint="Attributable votes — powers demographic analytics."
+              />
+              <AudienceCard
+                active={ballotMode === "anonymous"}
+                onClick={() => setBallotMode("anonymous")}
+                icon={EyeOff}
+                title="Anonymous"
+                hint="Unlinkable votes — no analytics, and votes can’t be changed."
+              />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Button type="submit" size="lg" disabled={mutation.isPending}>
+          {mutation.isPending ? "Publishing…" : "Publish poll"}
+        </Button>
+      </form>
+    </div>
   );
 }
 
