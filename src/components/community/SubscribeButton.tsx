@@ -28,21 +28,14 @@ export function SubscribeButton({
   const { data: subscribed, isLoading } = useQuery({
     queryKey: ["subscription", communityId],
     enabled: !!user,
-    queryFn: async () => {
-      try {
-        await getMySubscription(communityId);
-        return true;
-      } catch (e) {
-        if ((e as { status?: number }).status === 404) return false;
-        throw e;
-      }
-    },
+    queryFn: async () => (await getMySubscription(communityId)) !== null,
   });
 
   function invalidate() {
     queryClient.invalidateQueries({ queryKey: ["subscription", communityId] });
     queryClient.invalidateQueries({ queryKey: ["subscriptions"] });
     queryClient.invalidateQueries({ queryKey: ["community", communityId] });
+    queryClient.invalidateQueries({ queryKey: ["discoverCommunities"] });
   }
 
   const join = useMutation({

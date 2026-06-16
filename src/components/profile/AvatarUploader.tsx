@@ -4,7 +4,7 @@ import { useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Camera, Loader2 } from "lucide-react";
-import { uploadImage } from "@/lib/media";
+import { uploadImage, MediaRejectedError } from "@/lib/media";
 import { updateMe } from "@/lib/profile";
 import { ACCEPTED_IMAGE_TYPES, MAX_AVATAR_BYTES } from "@/lib/constants";
 import type { MeProfile } from "@/lib/types";
@@ -26,7 +26,7 @@ export function AvatarUploader({ user }: { user: MeProfile }) {
     e.target.value = "";
     if (!file) return;
     if (!ACCEPTED_IMAGE_TYPES.includes(file.type as (typeof ACCEPTED_IMAGE_TYPES)[number])) {
-      toast.error("Please choose a JPEG, PNG, or WebP image.");
+      toast.error("Please choose a JPEG or PNG image.");
       return;
     }
     if (file.size > MAX_AVATAR_BYTES) {
@@ -40,8 +40,12 @@ export function AvatarUploader({ user }: { user: MeProfile }) {
       queryClient.setQueryData(["me"], updated);
       setVersion((v) => v + 1);
       toast.success("Avatar updated");
-    } catch {
-      toast.error("Could not upload that image. Try again.");
+    } catch (err) {
+      toast.error(
+        err instanceof MediaRejectedError
+          ? "That image isn’t allowed."
+          : "Could not upload that image. Try again.",
+      );
     } finally {
       setBusy(false);
     }

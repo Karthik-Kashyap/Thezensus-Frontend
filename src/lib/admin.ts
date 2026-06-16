@@ -1,9 +1,11 @@
-// moderation-service ADMIN client — the platform Trust & Safety surface. Every call here requires
-// the platform `ADMIN` item: the UI gates the whole console on `MeProfile.isAdmin`, and the
-// moderation-service re-checks `requireAdmin` per request (a 403 means the cache is stale or the
-// grant was revoked). The user-facing report/appeal slice lives in lib/moderation.
+// Moderation ADMIN client — the platform Trust & Safety surface, now Convex
+// (api.moderation.*). The UI gates the console on `MeProfile.isAdmin`; every Convex
+// function re-checks the admin grant per call (a 403 means it was revoked). The
+// user-facing report/appeal slice lives in lib/moderation.
 
-import { api } from "./api";
+import { convex } from "./convexClient";
+import { api } from "../../convex/_generated/api";
+import { withApiError } from "./convexErrors";
 import type {
   CommentTakedownInput,
   LegalHold,
@@ -21,65 +23,89 @@ import type {
   UserModStatus,
 } from "./types";
 
-const enc = encodeURIComponent;
-
 export interface QueueParams {
   category?: ReportCategory;
   order?: "newest" | "oldest";
   limit?: number;
 }
 
-/** GET /moderation/reports — the open queue (optionally filtered to one category). */
-export function listReports(params: QueueParams = {}) {
-  const q = new URLSearchParams();
-  if (params.category) q.set("category", params.category);
-  if (params.order) q.set("order", params.order);
-  if (params.limit != null) q.set("limit", String(params.limit));
-  const qs = q.toString();
-  return api.get<{ reports: Report[] }>(`/moderation/reports${qs ? `?${qs}` : ""}`);
+/** The open queue (optionally filtered to one category). */
+export async function listReports(params: QueueParams = {}): Promise<{ reports: Report[] }> {
+  const reports = (await withApiError(
+    convex.query(api.moderation.listReports, params),
+  )) as unknown as Report[];
+  return { reports };
 }
 
-/** GET /moderation/reports/:id — the report + every report on the same target. */
+/** One report + every report on the same target. */
 export const getReport = (reportId: string) =>
-  api.get<ReportDetail>(`/moderation/reports/${enc(reportId)}`);
+  withApiError(
+    convex.query(api.moderation.getReportDetail, { reportId }),
+  ) as unknown as Promise<ReportDetail>;
 
-/** POST /moderation/reports/:id/resolve — close a report with an outcome. */
+/** Close a report with an outcome. */
 export const resolveReport = (reportId: string, input: ResolveReportInput) =>
-  api.post<Report>(`/moderation/reports/${enc(reportId)}/resolve`, input);
+  withApiError(
+    convex.mutation(api.moderation.resolveReport, { reportId, ...input }),
+  ) as unknown as Promise<Report>;
 
-/** POST /moderation/users/:linkId/suspend — temporary SUSPENDED (with `until`) or permanent BANNED. */
+/** Temporary SUSPENDED (with `until`) or permanent BANNED. */
 export const suspendUser = (linkId: string, input: SuspendInput) =>
-  api.post<UserModStatus>(`/moderation/users/${enc(linkId)}/suspend`, input);
+  withApiError(
+    convex.mutation(api.moderation.suspendUser, { linkId, ...input }),
+  ) as unknown as Promise<UserModStatus>;
 
-/** POST /moderation/users/:linkId/reinstate — lift a suspension/ban (204). */
+/** Lift a suspension/ban. */
 export const reinstateUser = (linkId: string) =>
-  api.post<void>(`/moderation/users/${enc(linkId)}/reinstate`);
+  withApiError(
+    convex.mutation(api.moderation.reinstateUser, { linkId }),
+  ) as unknown as Promise<void>;
 
-/** POST /moderation/polls/:id/takedown — exclude a poll from every read path (204). */
+/** Exclude a poll from every read path. */
 export const takedownPoll = (pollId: string, input: TakedownInput = {}) =>
-  api.post<void>(`/moderation/polls/${enc(pollId)}/takedown`, input);
+  withApiError(
+    convex.mutation(api.moderation.takedownPoll, { pollId, ...input }),
+  ) as unknown as Promise<void>;
 
-/** POST /moderation/polls/:id/restore — clear a poll takedown (204). */
+/** Clear a poll takedown. */
 export const restorePoll = (pollId: string) =>
-  api.post<void>(`/moderation/polls/${enc(pollId)}/restore`);
+  withApiError(
+    convex.mutation(api.moderation.restorePoll, { pollId }),
+  ) as unknown as Promise<void>;
 
-/** POST /moderation/comments/:id/takedown — hide a comment (204). Needs the comment's pollId (PK). */
+/** Hide a comment from everyone. (pollId was the old DDB PK; no longer needed.) */
 export const takedownComment = (commentId: string, input: CommentTakedownInput) =>
-  api.post<void>(`/moderation/comments/${enc(commentId)}/takedown`, input);
+  withApiError(
+    convex.mutation(api.moderation.takedownComment, {
+      commentId,
+      reason: input.reason,
+      reportId: input.reportId,
+    }),
+  ) as unknown as Promise<void>;
 
-/** POST /moderation/media/:id/preserve — move media off serving + lock it as evidence (204). */
+/** Move media off serving + lock it as evidence. */
 export const preserveMedia = (mediaId: string, input: PreserveMediaInput) =>
-  api.post<void>(`/moderation/media/${enc(mediaId)}/preserve`, input);
+  withApiError(
+    convex.mutation(api.moderation.preserveMedia, { mediaId, ...input }),
+  ) as unknown as Promise<void>;
 
-/** POST /moderation/holds — open a preservation hold (suspends deletion + TTL while ACTIVE) (201). */
-export const openHold = (input: OpenHoldInput) => api.post<LegalHold>("/moderation/holds", input);
+/** Open a preservation hold (suspends deletion + retention sweeps while ACTIVE). */
+export const openHold = (input: OpenHoldInput) =>
+  withApiError(convex.mutation(api.moderation.openLegalHold, input)) as unknown as Promise<LegalHold>;
 
-/** POST /moderation/holds/release — release every active hold on a subject. */
+/** Release every active hold on a subject. */
 export const releaseHold = (input: ReleaseHoldInput) =>
-  api.post<{ released: number }>("/moderation/holds/release", input);
+  withApiError(
+    convex.mutation(api.moderation.releaseLegalHold, input),
+  ) as unknown as Promise<{ released: number }>;
 
-/** GET /moderation/actions — the audit log for one target (newest first). */
-export const listActions = (targetType: SubjectType, targetId: string) =>
-  api.get<{ actions: ModAction[] }>(
-    `/moderation/actions?targetType=${enc(targetType)}&targetId=${enc(targetId)}`,
-  );
+/** The audit log for one target (newest first). */
+export async function listActions(
+  targetType: SubjectType,
+  targetId: string,
+): Promise<{ actions: ModAction[] }> {
+  const actions = (await withApiError(
+    convex.query(api.moderation.listActions, { targetType, targetId }),
+  )) as unknown as ModAction[];
+  return { actions };
+}

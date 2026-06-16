@@ -1,46 +1,68 @@
-// poll-service client.
+// Polls client — now Convex (api.polls.*). Promise-style wrappers keep the existing
+// React Query call sites working unchanged; the poll DETAIL page subscribes live via
+// useQuery(api.polls.get) instead (PollDetailView) — getPoll here is the request/
+// response fallback. Errors are rethrown in the legacy { status } shape (convexErrors).
 
-import { api } from "./api";
-import type { CreatePollInput, Page, Poll, PollListItem } from "./types";
+import { convex } from "./convexClient";
+import { api } from "../../convex/_generated/api";
+import { withApiError, type ApiError } from "./convexErrors";
+import type { CreatePollInput, DiscoverFeedResult, Page, Poll, PollListItem } from "./types";
 
-export const createPoll = (input: CreatePollInput) => api.post<Poll>("/polls", input);
+export const createPoll = (input: CreatePollInput) =>
+  withApiError(convex.mutation(api.polls.create, input)) as unknown as Promise<Poll>;
 
-export const getPoll = (id: string, token?: string) =>
-  api.get<Poll>(`/polls/${encodeURIComponent(id)}${token ? `?token=${encodeURIComponent(token)}` : ""}`);
+export const getPoll = async (id: string, token?: string): Promise<Poll> => {
+  const poll = await withApiError(convex.query(api.polls.get, { pollId: id, token }));
+  if (poll === null) {
+    const err = new Error("Poll not found") as ApiError;
+    err.status = 404;
+    throw err;
+  }
+  return poll as unknown as Poll;
+};
 
 export const updatePoll = (
   id: string,
   input: Partial<{ question: string; visibility: string; requireLoginToVote: boolean; status: "ACTIVE" | "CLOSED"; tags: string[]; category: string }>,
-) => api.patch<Poll>(`/polls/${encodeURIComponent(id)}`, input);
+) =>
+  withApiError(
+    convex.mutation(api.polls.update, {
+      pollId: id,
+      ...input,
+      visibility: input.visibility as "public" | "protected" | "private" | undefined,
+    }),
+  ) as unknown as Promise<Poll>;
 
-export const deletePoll = (id: string) => api.del<void>(`/polls/${encodeURIComponent(id)}`);
+export const deletePoll = (id: string) =>
+  withApiError(convex.mutation(api.polls.remove, { pollId: id })) as unknown as Promise<void>;
 
 /** Community feed (newest-first, cursor-paginated). */
 export const listCommunityPolls = (communityId: string, opts?: { limit?: number; cursor?: string }) =>
-  listPolls({ communityId, ...opts });
+  withApiError(
+    convex.query(api.polls.list, { communityId, limit: opts?.limit, cursor: opts?.cursor }),
+  ) as unknown as Promise<Page<PollListItem>>;
 
 /**
- * Global discovery feed — public polls from across the platform, independent of what you've joined
- * (poll-service GET /polls/discover). The backend ranking is swappable (recency for now); the client
- * just consumes the same {items,nextCursor} page envelope as the other feeds.
+ * Global discovery feed — hot-ranked public polls from across the platform, independent of
+ * what you've joined (the cold-start surface: liveliest, most-voted polls first). Ranking is
+ * server-side. Returns the trending-tag chips alongside the cards; `tag` narrows to one topic.
  */
-export const listDiscoverPolls = (opts?: { limit?: number; cursor?: string }) => {
-  const q = new URLSearchParams();
-  if (opts?.limit) q.set("limit", String(opts.limit));
-  if (opts?.cursor) q.set("cursor", opts.cursor);
-  const qs = q.toString();
-  return api.get<Page<PollListItem>>(`/polls/discover${qs ? `?${qs}` : ""}`);
-};
+export const listDiscoverPolls = (opts?: { limit?: number; tag?: string }) =>
+  withApiError(
+    convex.query(api.polls.discover, { limit: opts?.limit, tag: opts?.tag }),
+  ) as unknown as Promise<DiscoverFeedResult>;
+
+/**
+ * The signed-in user's home feed: polls from communities they've joined, hot-ranked
+ * server-side across all of them (candidate-generated, so no per-community recency cap).
+ */
+export const listHomeFeed = (opts?: { limit?: number }) =>
+  withApiError(
+    convex.query(api.polls.homeFeed, { limit: opts?.limit }),
+  ) as unknown as Promise<Page<PollListItem>>;
 
 /** A creator's polls (drives profile poll lists). */
 export const listCreatorPolls = (creatorId: string, opts?: { limit?: number; cursor?: string }) =>
-  listPolls({ creatorId, ...opts });
-
-function listPolls(params: { communityId?: string; creatorId?: string; limit?: number; cursor?: string }) {
-  const q = new URLSearchParams();
-  if (params.communityId) q.set("communityId", params.communityId);
-  if (params.creatorId) q.set("creatorId", params.creatorId);
-  if (params.limit) q.set("limit", String(params.limit));
-  if (params.cursor) q.set("cursor", params.cursor);
-  return api.get<Page<PollListItem>>(`/polls?${q.toString()}`);
-}
+  withApiError(
+    convex.query(api.polls.list, { creatorId, limit: opts?.limit, cursor: opts?.cursor }),
+  ) as unknown as Promise<Page<PollListItem>>;

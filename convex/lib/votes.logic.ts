@@ -1,0 +1,133 @@
+// Vote-path behavior: who may vote on what (port of voteAccess.logic), the voting
+// edition gate, and the demographics snapshot + flattened tally dims. The write rules
+// themselves live in votes.model (read its header before changing anything).
+
+import type { QueryCtx, MutationCtx } from "../_generated/server";
+import type { Doc } from "../_generated/dataModel";
+import {
+  POLL_AUDIENCE,
+  POLL_VISIBILITY,
+  POLL_STATUS,
+  EDITION_STATUS,
+  TALLY_DIMENSION,
+  SEGMENT_DIM_PREFIX,
+  dimKey,
+} from "./constants/poll";
+import { currentEditionLabel, windowState } from "./editions.logic";
+import { badRequest, notFound, forbidden, conflict } from "./errors";
+import { isMember, isOwnerOrMod, isBannedFromCommunity, getSubscription } from "./communities.model";
+import { getEdition } from "./polls.model";
+import { getDemographics } from "./users.model";
+
+type Ctx = QueryCtx | MutationCtx;
+
+/**
+ * Assert the caller may vote on this poll (visibility + token + ban + login rules).
+ * `linkId` null = anonymous guest. Throws notFound on access failure for LINK polls
+ * (existence is never leaked); forbidden/unauthenticated for community gates.
+ */
+export async function assertCanVote(
+  ctx: Ctx,
+  poll: Doc<"polls">,
+  linkId: string | null,
+  token?: string,
+): Promise<void> {
+  if (poll.audienceType === POLL_AUDIENCE.LINK) {
+    const isCreator = linkId !== null && poll.creatorId === linkId;
+    if (!isCreator && token !== poll.shareToken) throw notFound("Poll not found");
+    if (poll.requireLoginToVote && !linkId) throw forbidden("Sign in to vote on this poll");
+    return;
+  }
+
+  // COMMUNITY polls: login always required; visibility gates voting.
+  if (!linkId) throw forbidden("Sign in to vote");
+  const communityId = poll.communityId;
+  if (!communityId) return; // defensive — community polls always carry one
+  if (await isBannedFromCommunity(ctx, linkId, communityId)) {
+    throw forbidden("You are banned from this community");
+  }
+  const visibility = poll.visibility ?? POLL_VISIBILITY.PUBLIC;
+  if (visibility === POLL_VISIBILITY.PUBLIC) return;
+  if (poll.creatorId === linkId) return;
+  if (await isMember(ctx, linkId, communityId)) return;
+  if (await isOwnerOrMod(ctx, linkId, communityId)) return;
+  throw forbidden("Membership required to vote on this poll");
+}
+
+export interface VotingEdition {
+  label: string;
+  status: "OPEN" | "CLOSED";
+  windowState: "PENDING" | "ACTIVE" | "ENDED";
+}
+
+/** The edition votes land on right now, or throws the legacy 409s when voting is shut. */
+export async function resolveVotingEdition(
+  ctx: Ctx,
+  poll: Doc<"polls">,
+  { assertOpen }: { assertOpen: boolean },
+): Promise<VotingEdition> {
+  if (assertOpen && poll.status === POLL_STATUS.CLOSED) throw conflict("This poll is closed");
+
+  const label = currentEditionLabel(poll);
+  const state = windowState(label, poll.recurrenceStart, poll.recurrenceEnd);
+  if (assertOpen) {
+    if (state === "PENDING") throw conflict("Voting has not started");
+    if (state === "ENDED") throw conflict("Voting has ended");
+  }
+  const edition = await getEdition(ctx, poll.pollId, label);
+  const status = edition?.status ?? EDITION_STATUS.OPEN;
+  if (assertOpen && status === EDITION_STATUS.CLOSED) {
+    throw conflict("This edition is closed for voting");
+  }
+  return { label, status, windowState: state };
+}
+
+export function assertValidOption(poll: Doc<"polls">, optionId: string): void {
+  if (!poll.options.some((o) => o.id === optionId)) throw badRequest("Unknown option");
+}
+
+export interface DemographicsSnapshot {
+  gender?: string;
+  ageAtVote?: number;
+  region?: string;
+  segments?: Record<string, string>;
+}
+
+/**
+ * The voter's demographics, frozen at vote time — captured ONLY with `demographics`
+ * consent (ADR-009); later edits never rewrite history. Segments snapshot from the
+ * voter's subscription to the poll's community.
+ */
+export async function demographicsSnapshot(
+  ctx: Ctx,
+  linkId: string,
+  poll: Doc<"polls">,
+): Promise<DemographicsSnapshot | undefined> {
+  const demo = await getDemographics(ctx, linkId);
+  if (!demo?.demographicsConsent) return undefined;
+
+  const snapshot: DemographicsSnapshot = {};
+  if (demo.gender !== undefined) snapshot.gender = demo.gender;
+  if (demo.region !== undefined) snapshot.region = demo.region;
+  if (demo.birthYear !== undefined) {
+    snapshot.ageAtVote = new Date().getUTCFullYear() - demo.birthYear;
+  }
+  if (poll.communityId) {
+    const sub = await getSubscription(ctx, linkId, poll.communityId);
+    if (sub?.segments && Object.keys(sub.segments).length > 0) snapshot.segments = sub.segments;
+  }
+  return Object.keys(snapshot).length > 0 ? snapshot : undefined;
+}
+
+/** Flatten a snapshot to the voteEvents dim keys the tally folds ("gender#female", …). */
+export function toDims(snapshot: DemographicsSnapshot | undefined): string[] | undefined {
+  if (!snapshot) return undefined;
+  const dims: string[] = [];
+  if (snapshot.gender !== undefined) dims.push(dimKey(TALLY_DIMENSION.GENDER, snapshot.gender));
+  if (snapshot.ageAtVote !== undefined) dims.push(dimKey(TALLY_DIMENSION.AGE, String(snapshot.ageAtVote)));
+  if (snapshot.region !== undefined) dims.push(dimKey(TALLY_DIMENSION.REGION, snapshot.region));
+  for (const [segId, answer] of Object.entries(snapshot.segments ?? {})) {
+    dims.push(dimKey(`${SEGMENT_DIM_PREFIX}${segId}`, answer));
+  }
+  return dims.length > 0 ? dims : undefined;
+}

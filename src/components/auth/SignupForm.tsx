@@ -10,9 +10,28 @@ import type { CompleteSignupInput } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 type Rejection = "under_age" | "no_pending" | null;
+
+const MONTHS = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+];
+
+/** Compose day/month/year into ISO yyyy-mm-dd, or null if not a real past date. */
+function toBirthDate(day: string, month: string, year: string): string | null {
+  const d = Number(day);
+  const m = Number(month);
+  const y = Number(year);
+  if (!d || !m || !y || year.length !== 4) return null;
+  const date = new Date(Date.UTC(y, m - 1, d));
+  const isReal =
+    date.getUTCFullYear() === y && date.getUTCMonth() === m - 1 && date.getUTCDate() === d;
+  if (!isReal || y < 1900 || date.getTime() > Date.now()) return null;
+  return `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+}
 
 /**
  * Step 2 of first-time Google sign-in (ADR-008/009): collect a date of birth + baseline consent,
@@ -20,11 +39,19 @@ type Rejection = "under_age" | "no_pending" | null;
  * (403 → nothing stored) and requires the signup-pending cookie set by the OAuth callback
  * (a 400 means there's no pending signup — the user must start sign-in again).
  */
-export function SignupForm() {
+export function SignupForm({
+  defaultDisplayName,
+  returnTo,
+}: {
+  defaultDisplayName?: string;
+  returnTo?: string;
+}) {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const [birthDate, setBirthDate] = useState("");
-  const [displayName, setDisplayName] = useState("");
+  const [birthDay, setBirthDay] = useState("");
+  const [birthMonth, setBirthMonth] = useState("");
+  const [birthYear, setBirthYear] = useState("");
+  const [displayName, setDisplayName] = useState(defaultDisplayName ?? "");
   const [demographics, setDemographics] = useState(false);
   const [marketingEmail, setMarketingEmail] = useState(false);
   const [rejection, setRejection] = useState<Rejection>(null);
@@ -34,7 +61,7 @@ export function SignupForm() {
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["me"] });
       toast.success("Welcome to Thezensus!");
-      router.push("/me");
+      router.push(returnTo ?? "/me");
     },
     onError: (e) => {
       const status = (e as { status?: number }).status;
@@ -46,7 +73,8 @@ export function SignupForm() {
 
   function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!birthDate) return toast.error("Please enter your date of birth.");
+    const birthDate = toBirthDate(birthDay, birthMonth, birthYear);
+    if (!birthDate) return toast.error("Please enter a valid date of birth.");
     mutation.mutate({
       birthDate,
       displayName: displayName.trim() || undefined,
@@ -91,22 +119,6 @@ export function SignupForm() {
       <CardContent>
         <form onSubmit={onSubmit} className="space-y-5">
           <div className="space-y-1.5">
-            <Label htmlFor="birthDate">Date of birth</Label>
-            <Input
-              id="birthDate"
-              type="date"
-              required
-              max={new Date().toISOString().slice(0, 10)}
-              value={birthDate}
-              onChange={(e) => setBirthDate(e.target.value)}
-            />
-            <p className="text-xs text-muted-foreground">
-              Used once to confirm you’re 13+ and to power age-based poll analytics. We store it
-              privately — it’s never shown on your profile.
-            </p>
-          </div>
-
-          <div className="space-y-1.5">
             <Label htmlFor="displayName">Display name (optional)</Label>
             <Input
               id="displayName"
@@ -115,6 +127,50 @@ export function SignupForm() {
               value={displayName}
               onChange={(e) => setDisplayName(e.target.value)}
             />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="birthDay">Date of birth</Label>
+            <div className="grid grid-cols-[1fr_5rem_6rem] gap-2">
+              <Select
+                aria-label="Month"
+                required
+                value={birthMonth}
+                onChange={(e) => setBirthMonth(e.target.value)}
+              >
+                <option value="" disabled>
+                  Month
+                </option>
+                {MONTHS.map((name, i) => (
+                  <option key={name} value={i + 1}>
+                    {name}
+                  </option>
+                ))}
+              </Select>
+              <Input
+                id="birthDay"
+                aria-label="Day"
+                required
+                inputMode="numeric"
+                maxLength={2}
+                placeholder="DD"
+                value={birthDay}
+                onChange={(e) => setBirthDay(e.target.value.replace(/\D/g, ""))}
+              />
+              <Input
+                aria-label="Year"
+                required
+                inputMode="numeric"
+                maxLength={4}
+                placeholder="YYYY"
+                value={birthYear}
+                onChange={(e) => setBirthYear(e.target.value.replace(/\D/g, ""))}
+              />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Used once to confirm you’re 13+ and to power age-based poll analytics. We store it
+              privately — it’s never shown on your profile.
+            </p>
           </div>
 
           <fieldset className="space-y-3 rounded-lg border p-4">

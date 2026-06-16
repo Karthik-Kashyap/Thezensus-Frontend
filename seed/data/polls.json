@@ -1,0 +1,428 @@
+{
+  "_note": "community: name ref from communities.json, or null for an unlisted LINK poll. ballotMode standard = attributable votes with demographic breakdowns (capped at member count); anonymous = guest votes, bigger numbers, no breakdown. weights: relative pull per option (defaults to even). votes: target count. comments: how many to attach.",
+  "polls": [
+    {
+      "community": "Technology",
+      "question": "Tabs or spaces?",
+      "type": "binary",
+      "options": ["Spaces", "Tabs"],
+      "ballotMode": "standard",
+      "tags": ["software", "debates"],
+      "votes": 48,
+      "weights": [0.62, 0.38],
+      "comments": 5
+    },
+    {
+      "community": "Technology",
+      "question": "Will AI write most production code within 5 years?",
+      "type": "binary",
+      "options": ["Yes", "No"],
+      "ballotMode": "standard",
+      "tags": ["ai", "software"],
+      "votes": 44,
+      "weights": [0.55, 0.45],
+      "comments": 4
+    },
+    {
+      "community": "Technology",
+      "question": "Best phone ecosystem right now?",
+      "type": "multi",
+      "options": ["iPhone", "Android (Pixel)", "Android (Samsung)", "I just want a brick that calls"],
+      "ballotMode": "standard",
+      "tags": ["gadgets", "ai"],
+      "votes": 41,
+      "weights": [0.4, 0.25, 0.25, 0.1],
+      "comments": 3
+    },
+    {
+      "community": "Technology",
+      "question": "Dark mode or light mode?",
+      "type": "binary",
+      "options": ["Dark mode", "Light mode (you monster)"],
+      "ballotMode": "anonymous",
+      "tags": ["gadgets", "debates"],
+      "votes": 260,
+      "weights": [0.78, 0.22],
+      "comments": 4
+    },
+    {
+      "community": "Technology",
+      "question": "Is the metaverse coming back?",
+      "type": "binary",
+      "options": ["No chance", "Don't count it out"],
+      "ballotMode": "standard",
+      "tags": ["tech", "ai"],
+      "votes": 33,
+      "weights": [0.7, 0.3],
+      "comments": 2
+    },
+
+    {
+      "community": "Movies & TV",
+      "question": "Best sci-fi franchise?",
+      "type": "multi",
+      "options": ["Star Wars", "Star Trek", "Dune", "The Matrix"],
+      "ballotMode": "standard",
+      "tags": ["movies", "film"],
+      "votes": 46,
+      "weights": [0.35, 0.25, 0.28, 0.12],
+      "comments": 5
+    },
+    {
+      "community": "Movies & TV",
+      "question": "Was the finale of your favorite show actually good?",
+      "type": "binary",
+      "options": ["Yes, it stuck the landing", "No, we don't talk about it"],
+      "ballotMode": "standard",
+      "tags": ["tv", "streaming"],
+      "votes": 39,
+      "weights": [0.42, 0.58],
+      "comments": 4
+    },
+    {
+      "community": "Movies & TV",
+      "question": "Theater or streaming at home?",
+      "type": "binary",
+      "options": ["Big screen, every time", "Couch, blanket, pause button"],
+      "ballotMode": "anonymous",
+      "tags": ["movies", "streaming"],
+      "votes": 310,
+      "weights": [0.38, 0.62],
+      "comments": 3
+    },
+    {
+      "community": "Movies & TV",
+      "question": "Subtitles on or off?",
+      "type": "binary",
+      "options": ["On, always", "Off"],
+      "ballotMode": "standard",
+      "tags": ["tv", "streaming"],
+      "votes": 37,
+      "weights": [0.66, 0.34],
+      "comments": 3
+    },
+
+    {
+      "community": "Food & Cooking",
+      "question": "Pineapple on pizza?",
+      "type": "binary",
+      "options": ["Yes, and it's delicious", "Absolutely not"],
+      "ballotMode": "anonymous",
+      "tags": ["food", "debates"],
+      "votes": 375,
+      "weights": [0.47, 0.53],
+      "comments": 5
+    },
+    {
+      "community": "Food & Cooking",
+      "question": "Best comfort food?",
+      "type": "multi",
+      "options": ["Pizza", "Ramen", "Mac & cheese", "Tacos"],
+      "ballotMode": "standard",
+      "tags": ["food", "recipes"],
+      "votes": 43,
+      "weights": [0.3, 0.28, 0.18, 0.24],
+      "comments": 4
+    },
+    {
+      "community": "Food & Cooking",
+      "question": "Cereal: milk first or cereal first?",
+      "type": "binary",
+      "options": ["Cereal first", "Milk first (chaos)"],
+      "ballotMode": "standard",
+      "tags": ["debates", "food"],
+      "votes": 40,
+      "weights": [0.82, 0.18],
+      "comments": 3
+    },
+    {
+      "community": "Food & Cooking",
+      "question": "Is a hot dog a sandwich?",
+      "type": "binary",
+      "options": ["Yes", "No"],
+      "ballotMode": "anonymous",
+      "tags": ["debates", "food"],
+      "votes": 220,
+      "weights": [0.36, 0.64],
+      "comments": 4
+    },
+
+    {
+      "community": "Gaming",
+      "question": "Best way to game?",
+      "type": "multi",
+      "options": ["PC master race", "Console", "Handheld", "Phone, unironically"],
+      "ballotMode": "standard",
+      "tags": ["gaming", "games"],
+      "votes": 45,
+      "weights": [0.42, 0.33, 0.18, 0.07],
+      "comments": 5
+    },
+    {
+      "community": "Gaming",
+      "question": "Should remakes count as Game of the Year?",
+      "type": "binary",
+      "options": ["Yes", "No, make something new"],
+      "ballotMode": "standard",
+      "tags": ["games", "debates"],
+      "votes": 34,
+      "weights": [0.4, 0.6],
+      "comments": 3
+    },
+    {
+      "community": "Gaming",
+      "question": "Difficulty: do you finish on hard mode?",
+      "type": "binary",
+      "options": ["Hard mode or nothing", "Story mode, no shame"],
+      "ballotMode": "anonymous",
+      "tags": ["gaming", "esports"],
+      "votes": 180,
+      "weights": [0.45, 0.55],
+      "comments": 2
+    },
+    {
+      "community": "Gaming",
+      "question": "Best indie game of the last few years?",
+      "type": "multi",
+      "options": ["Hades", "Hollow Knight", "Stardew Valley", "Celeste"],
+      "ballotMode": "standard",
+      "tags": ["indie", "games"],
+      "votes": 38,
+      "weights": [0.27, 0.27, 0.28, 0.18],
+      "comments": 4
+    },
+
+    {
+      "community": "Sports",
+      "question": "GOAT of basketball?",
+      "type": "multi",
+      "options": ["Jordan", "LeBron", "Kareem", "Someone you'll yell about in the comments"],
+      "ballotMode": "anonymous",
+      "tags": ["basketball", "sports"],
+      "votes": 290,
+      "weights": [0.44, 0.4, 0.08, 0.08],
+      "comments": 5
+    },
+    {
+      "community": "Sports",
+      "question": "Soccer or football (the American kind)?",
+      "type": "binary",
+      "options": ["Soccer", "American football"],
+      "ballotMode": "standard",
+      "tags": ["soccer", "football"],
+      "votes": 42,
+      "weights": [0.58, 0.42],
+      "comments": 3
+    },
+    {
+      "community": "Sports",
+      "question": "Should ties exist in sports?",
+      "type": "binary",
+      "options": ["Ties are fine", "Someone has to win"],
+      "ballotMode": "standard",
+      "tags": ["sports", "debates"],
+      "votes": 31,
+      "weights": [0.3, 0.7],
+      "comments": 2
+    },
+    {
+      "community": "Sports",
+      "question": "Best Olympic event to watch?",
+      "type": "multi",
+      "options": ["Gymnastics", "Track", "Swimming", "Curling (yes, curling)"],
+      "ballotMode": "standard",
+      "tags": ["sports"],
+      "votes": 36,
+      "weights": [0.3, 0.25, 0.25, 0.2],
+      "comments": 3
+    },
+
+    {
+      "community": "Music",
+      "question": "Vinyl, streaming, or CDs?",
+      "type": "multi",
+      "options": ["Vinyl", "Streaming", "CDs (respect)", "I still buy MP3s"],
+      "ballotMode": "standard",
+      "tags": ["music", "albums"],
+      "votes": 40,
+      "weights": [0.3, 0.55, 0.1, 0.05],
+      "comments": 4
+    },
+    {
+      "community": "Music",
+      "question": "Concerts: front row or back with good sound?",
+      "type": "binary",
+      "options": ["Front row energy", "Back, perfect mix"],
+      "ballotMode": "standard",
+      "tags": ["concerts", "music"],
+      "votes": 35,
+      "weights": [0.52, 0.48],
+      "comments": 3
+    },
+    {
+      "community": "Music",
+      "question": "Is a song's lyrics or its beat more important?",
+      "type": "binary",
+      "options": ["Lyrics", "Beat"],
+      "ballotMode": "anonymous",
+      "tags": ["music", "playlists"],
+      "votes": 200,
+      "weights": [0.49, 0.51],
+      "comments": 4
+    },
+    {
+      "community": "Music",
+      "question": "Best decade for music?",
+      "type": "multi",
+      "options": ["80s", "90s", "2000s", "Right now"],
+      "ballotMode": "standard",
+      "tags": ["music", "albums"],
+      "votes": 39,
+      "weights": [0.26, 0.34, 0.24, 0.16],
+      "comments": 3
+    },
+
+    {
+      "community": "Everyday Debates",
+      "question": "Is water wet?",
+      "type": "binary",
+      "options": ["Yes", "No"],
+      "ballotMode": "anonymous",
+      "tags": ["debates", "opinions"],
+      "votes": 340,
+      "weights": [0.6, 0.4],
+      "comments": 5
+    },
+    {
+      "community": "Everyday Debates",
+      "question": "Toilet paper: over or under?",
+      "type": "binary",
+      "options": ["Over", "Under"],
+      "ballotMode": "anonymous",
+      "tags": ["debates", "life"],
+      "votes": 280,
+      "weights": [0.72, 0.28],
+      "comments": 4
+    },
+    {
+      "community": "Everyday Debates",
+      "question": "Best season?",
+      "type": "multi",
+      "options": ["Spring", "Summer", "Autumn", "Winter"],
+      "ballotMode": "standard",
+      "tags": ["life", "opinions"],
+      "votes": 44,
+      "weights": [0.2, 0.28, 0.34, 0.18],
+      "comments": 4
+    },
+    {
+      "community": "Everyday Debates",
+      "question": "Do you reply-all on purpose?",
+      "type": "binary",
+      "options": ["Never, I have manners", "Sometimes the moment calls for it"],
+      "ballotMode": "standard",
+      "tags": ["life", "debates"],
+      "votes": 30,
+      "weights": [0.75, 0.25],
+      "comments": 2
+    },
+
+    {
+      "community": "Everyday Debates",
+      "question": "Daily mood check: how's today going?",
+      "type": "multi",
+      "options": ["Great", "Fine", "Rough", "Don't ask"],
+      "ballotMode": "standard",
+      "recurrence": "DAILY",
+      "timezone": "America/New_York",
+      "tags": ["life", "opinions"],
+      "votes": 40,
+      "weights": [0.3, 0.4, 0.2, 0.1],
+      "comments": 3
+    },
+    {
+      "community": "Music",
+      "question": "This week's vibe — what's on repeat?",
+      "type": "multi",
+      "options": ["Pop", "Hip-hop", "Rock", "Something cozy"],
+      "ballotMode": "anonymous",
+      "recurrence": "WEEKLY",
+      "timezone": "UTC",
+      "tags": ["music", "playlists"],
+      "votes": 150,
+      "weights": [0.3, 0.28, 0.22, 0.2],
+      "comments": 3
+    },
+    {
+      "community": "Gaming",
+      "question": "Game of the month?",
+      "type": "multi",
+      "options": ["The new release", "A backlog gem", "Multiplayer with friends", "Still on last month's"],
+      "ballotMode": "standard",
+      "recurrence": "MONTHLY",
+      "timezone": "UTC",
+      "tags": ["gaming", "games"],
+      "votes": 35,
+      "weights": [0.35, 0.25, 0.3, 0.1],
+      "comments": 3
+    },
+    {
+      "community": "Sports",
+      "question": "Tournament bracket: who takes the title?",
+      "type": "multi",
+      "options": ["The top seed", "The underdog", "A dark horse", "Pure chaos"],
+      "ballotMode": "standard",
+      "recurrence": "MANUAL",
+      "tags": ["sports"],
+      "votes": 38,
+      "weights": [0.4, 0.25, 0.25, 0.1],
+      "comments": 4
+    },
+    {
+      "community": "Technology",
+      "question": "[Closed] Best laptop of 2025?",
+      "type": "multi",
+      "options": ["MacBook", "ThinkPad", "Dell XPS", "A Chromebook, fight me"],
+      "ballotMode": "standard",
+      "status": "CLOSED",
+      "tags": ["gadgets"],
+      "votes": 44,
+      "weights": [0.45, 0.28, 0.2, 0.07],
+      "comments": 4
+    },
+    {
+      "community": "Movies & TV",
+      "question": "[Closed] Best picture of last year?",
+      "type": "binary",
+      "options": ["The one that won", "The one that got robbed"],
+      "ballotMode": "anonymous",
+      "status": "CLOSED",
+      "tags": ["movies", "film"],
+      "votes": 240,
+      "weights": [0.42, 0.58],
+      "comments": 3
+    },
+    {
+      "community": null,
+      "question": "Which logo should we go with? (share-link poll)",
+      "type": "multi",
+      "options": ["The blue one", "The bold one", "The minimal one"],
+      "ballotMode": "anonymous",
+      "tags": ["design"],
+      "votes": 64,
+      "weights": [0.3, 0.45, 0.25],
+      "comments": 2
+    },
+    {
+      "community": null,
+      "question": "Team lunch Friday — where to?",
+      "type": "multi",
+      "options": ["Tacos", "Sushi", "That sandwich place", "Anywhere with AC"],
+      "ballotMode": "anonymous",
+      "tags": ["food"],
+      "votes": 27,
+      "weights": [0.3, 0.25, 0.2, 0.25],
+      "comments": 1
+    }
+  ]
+}

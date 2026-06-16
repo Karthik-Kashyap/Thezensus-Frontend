@@ -1,0 +1,113 @@
+// Compute-don't-roll edition engine (SCRATCH-007), ported verbatim from
+// backend/shared/src/editions. There is NO scheduler flipping editions: the current
+// edition label is a pure function of (recurrence, timezone, server clock), and the
+// active window is a pure function of (recurrenceStart/End, that label). Both the poll
+// read path and the vote write gate use this exact same math.
+
+import { RECURRENCE, MAIN_EDITION, type Recurrence } from "./constants/poll";
+
+/** Recurrences whose edition label is derived from the clock (vs. stored). */
+const TIME_BASED: ReadonlySet<Recurrence> = new Set([
+  RECURRENCE.DAILY,
+  RECURRENCE.WEEKLY,
+  RECURRENCE.MONTHLY,
+  RECURRENCE.YEARLY,
+]);
+
+/** True when the label is computed from the clock rather than read from `currentEdition`. */
+export function isTimeBased(recurrence: Recurrence): boolean {
+  return TIME_BASED.has(recurrence);
+}
+
+/** The y/m/d of an instant as seen in a given IANA timezone (not the server's zone). */
+function zonedYmd(at: Date, timezone: string): { year: number; month: number; day: number } {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: timezone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(at);
+  const get = (t: string) => Number(parts.find((p) => p.type === t)!.value);
+  return { year: get("year"), month: get("month"), day: get("day") };
+}
+
+const pad = (n: number, width = 2) => String(n).padStart(width, "0");
+
+/**
+ * ISO-8601 week label `YYYY-Www` for a calendar date. The week-year can differ from
+ * the calendar year at the boundary (e.g. Dec 31 may belong to next year's W01). Uses a
+ * UTC anchor so the arithmetic is timezone-free once y/m/d is fixed.
+ */
+function isoWeekLabel(year: number, month: number, day: number): string {
+  const date = new Date(Date.UTC(year, month - 1, day));
+  // ISO weekday: Mon=1..Sun=7. Shift to the Thursday of this week — its year is the
+  // ISO week-year and its day-of-year gives the week number.
+  const isoDow = date.getUTCDay() === 0 ? 7 : date.getUTCDay();
+  date.setUTCDate(date.getUTCDate() + 4 - isoDow);
+  const weekYear = date.getUTCFullYear();
+  const firstThursday = new Date(Date.UTC(weekYear, 0, 1));
+  const firstDow = firstThursday.getUTCDay() === 0 ? 7 : firstThursday.getUTCDay();
+  firstThursday.setUTCDate(firstThursday.getUTCDate() + 4 - firstDow);
+  const week = 1 + Math.round((date.getTime() - firstThursday.getTime()) / (7 * 86_400_000));
+  return `${weekYear}-W${pad(week)}`;
+}
+
+/**
+ * The edition label for a poll at instant `at`. Time-based recurrences derive a label
+ * snapped to their natural period in the poll's timezone; NONE/MANUAL have no clock
+ * component and return the fixed `main` label (callers prefer the stored
+ * `currentEdition` cache for MANUAL once a roll endpoint exists).
+ */
+export function computeEditionLabel(
+  recurrence: Recurrence,
+  timezone: string | undefined,
+  at: Date = new Date(),
+): string {
+  if (!isTimeBased(recurrence)) return MAIN_EDITION;
+  const zone = timezone ?? "UTC";
+  const { year, month, day } = zonedYmd(at, zone);
+  switch (recurrence) {
+    case RECURRENCE.DAILY:
+      return `${year}-${pad(month)}-${pad(day)}`;
+    case RECURRENCE.WEEKLY:
+      return isoWeekLabel(year, month, day);
+    case RECURRENCE.MONTHLY:
+      return `${year}-${pad(month)}`;
+    case RECURRENCE.YEARLY:
+      return `${year}`;
+    default:
+      return MAIN_EDITION;
+  }
+}
+
+/** Tri-state of the recurrence window: before it starts, within it, or after it ends. */
+export type WindowState = "PENDING" | "ACTIVE" | "ENDED";
+
+/**
+ * Where `label` sits relative to the optional [start, end] window (both inclusive).
+ * Labels of the same granularity sort lexicographically in chronological order, so a
+ * plain string compare is correct for every cadence (`YYYY-MM-DD`, `YYYY-Www`, …).
+ */
+export function windowState(
+  label: string,
+  recurrenceStart?: string,
+  recurrenceEnd?: string,
+): WindowState {
+  if (recurrenceStart && label < recurrenceStart) return "PENDING";
+  if (recurrenceEnd && label > recurrenceEnd) return "ENDED";
+  return "ACTIVE";
+}
+
+/**
+ * The label votes land on / readers see right now. MANUAL prefers the stored memo
+ * (authoritative for non-time-based); time-based recurrences always recompute —
+ * for those the memo is informational only.
+ */
+export function currentEditionLabel(poll: {
+  recurrence: Recurrence;
+  timezone?: string;
+  currentEdition?: string;
+}): string {
+  if (!isTimeBased(poll.recurrence)) return poll.currentEdition ?? MAIN_EDITION;
+  return computeEditionLabel(poll.recurrence, poll.timezone);
+}

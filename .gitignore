@@ -8,3 +8,7 @@ build/
 .DS_Store
 *.tsbuildinfo
 next-env.d.ts
+
+# Local agent/editor tooling state (machine-specific)
+.claude/
+.agents/

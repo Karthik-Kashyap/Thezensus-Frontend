@@ -161,11 +161,24 @@ export interface Subscription {
   segments: Record<string, string>;
 }
 
+/** Compact community card for list views (e.g. the sidebar's discover list). */
+export interface CommunitySummary {
+  communityId: string;
+  name: string;
+  subscriberCount: number;
+  description?: string;
+  iconKey?: string;
+}
+
 // ── Polls (poll-service) ─────────────────────────────────────────────────────
 export interface PollOption {
   id: string;
   label: string;
-  mediaUrl?: string;
+  /** Denormalized READY serving key + media id for the option image. Resolved to a URL
+   *  client-side via useMediaUrl (public CDN base, or presigned GET of the viewer's own
+   *  media) — same pattern as avatarKey. */
+  mediaId?: string;
+  mediaKey?: string;
 }
 
 export interface EditionScoreboard {
@@ -174,15 +187,21 @@ export interface EditionScoreboard {
   status: EditionStatus;
   voteCount: number;
   optionCounts: Record<string, number>;
+  /** Tally publish stamp (Convex); used to expire optimistic vote overlays. */
+  publishedAt?: number;
 }
 
 export interface Poll {
   pollId: string;
   creatorId: string;
+  /** The creator's display name, resolved server-side (absent if the profile is gone). */
+  creatorDisplayName?: string;
   audienceType: AudienceType;
   communityId?: string;
   question: string;
-  questionMediaUrl?: string;
+  /** Question image (optional): denormalized serving key + media id, resolved like avatarKey. */
+  questionMediaId?: string;
+  questionMediaKey?: string;
   type: PollType;
   options: PollOption[];
   visibility?: Visibility;
@@ -197,32 +216,64 @@ export interface Poll {
   status: PollStatus;
   tags?: string[];
   category?: string;
+  /** Creator's choice to reveal the result breakdown on the social share card. Absent = reveal. */
+  shareCardShowResults?: boolean;
   createdAt: string;
   currentEdition: EditionScoreboard;
 }
 
-/** Feed item — leaner than the detail (no scoreboard/edition). */
+/**
+ * Feed item — the compact poll plus the live current-edition scoreboard (so feed cards vote +
+ * render results in place) and a count of visible comments. `commentCountCapped` true → the count
+ * was capped at one DynamoDB page server-side; render it as "N+".
+ */
 export interface PollListItem {
   pollId: string;
   creatorId: string;
+  creatorDisplayName?: string;
   audienceType: AudienceType;
   communityId?: string;
   question: string;
+  questionMediaId?: string;
+  questionMediaKey?: string;
   type: PollType;
   options: PollOption[];
   visibility?: Visibility;
   ballotMode: BallotMode;
   recurrence: Recurrence;
+  recurrenceStart?: string;
+  recurrenceEnd?: string;
   status: PollStatus;
   tags?: string[];
   category?: string;
   createdAt: string;
+  currentEdition: EditionScoreboard;
+  commentCount: number;
+  commentCountCapped: boolean;
+}
+
+/**
+ * The minimal poll shape the VotePanel needs to cast + show votes. Both the full `Poll` (detail
+ * page) and the enriched `PollListItem` (feed cards) structurally satisfy it. `requireLoginToVote`
+ * is optional because feed cards are always COMMUNITY polls — guest voting is a LINK-poll concern.
+ */
+export interface VotablePoll {
+  pollId: string;
+  /** The poll creator's linkId — the owner of any option/question media (for presign fallback). */
+  creatorId: string;
+  options: PollOption[];
+  status: PollStatus;
+  ballotMode: BallotMode;
+  audienceType: AudienceType;
+  requireLoginToVote?: boolean;
+  currentEdition: EditionScoreboard;
 }
 
 export interface CreatePollInput {
   audienceType?: AudienceType;
   communityId?: string;
   question: string;
+  questionMediaId?: string;
   type: PollType;
   options: { id: string; label: string; mediaId?: string }[];
   visibility?: Visibility;
@@ -234,11 +285,22 @@ export interface CreatePollInput {
   recurrenceEnd?: string;
   tags?: string[];
   category?: string;
+  shareCardShowResults?: boolean;
 }
 
 export interface Page<T> {
   items: T[];
   nextCursor?: string;
+}
+
+/**
+ * The Discover feed response: hot-ranked cards plus the trending-tag chips (derived from the
+ * same candidate pool, hot-weighted) that drive the topic filter. `tags` reflects the whole
+ * pool regardless of the selected topic, so the chip row stays stable while filtering.
+ */
+export interface DiscoverFeedResult {
+  items: PollListItem[];
+  tags: string[];
 }
 
 // ── Votes (vote-service) ─────────────────────────────────────────────────────
@@ -280,9 +342,17 @@ export interface Comment {
 }
 
 // ── Media (media-service) ────────────────────────────────────────────────────
-export type MediaKind = "avatar" | "community_icon";
-export type MediaStatus = "PENDING" | "PROCESSING" | "READY" | "FAILED" | "REJECTED";
-export type MediaContentType = "image/jpeg" | "image/png" | "image/webp";
+export type MediaKind = "avatar" | "community_icon" | "poll_question" | "poll_option";
+export type MediaStatus =
+  | "PENDING"
+  | "UPLOADED"
+  | "PROCESSING"
+  | "READY"
+  | "FAILED"
+  | "REJECTED"
+  | "PRESERVED";
+// JPEG/PNG only — the moderation scanner (Rekognition) can't read WebP (see constants.ts).
+export type MediaContentType = "image/jpeg" | "image/png";
 
 export interface InitiateUploadInput {
   kind: MediaKind;

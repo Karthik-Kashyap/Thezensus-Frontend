@@ -1,22 +1,29 @@
-// Client-side session state. The session is an httpOnly cookie we can't read from JS,
-// so "who am I" is answered by probing /users/me: a profile means signed in, 401 means out.
+// Client-side session state, now Convex-live. The session is an httpOnly cookie the
+// browser can't read; "who am I" is the live `users.me` query — null when signed out
+// (the old "401 from /users/me" contract). Components keep the same { user, isLoading,
+// refetch } shape as the React-Query era; profile edits now propagate INSTANTLY to every
+// subscriber (no ["me"] cache invalidation needed).
 
-import { useQuery } from "@tanstack/react-query";
-import { api } from "./api";
+"use client";
+
+import { useQuery } from "convex/react";
+import { api } from "../../convex/_generated/api";
+import { convex } from "./convexClient";
 import type { MeProfile } from "./types";
 
-/** The current user's profile, or null if not signed in. */
+/** One-shot read of the current user (for non-hook call sites). Null = signed out. */
 export async function getCurrentUser(): Promise<MeProfile | null> {
-  try {
-    return await api.get<MeProfile>("/users/me");
-  } catch (e) {
-    if ((e as { status?: number }).status === 401) return null;
-    throw e;
-  }
+  return (await convex.query(api.users.me, {})) as MeProfile | null;
 }
 
-/** React-query-backed session hook. The ["me"] key is shared with the profile editor. */
+/** Live session hook. `isLoading` covers the initial connect + auth handshake. */
 export function useSession() {
-  const { data, isLoading, refetch } = useQuery({ queryKey: ["me"], queryFn: getCurrentUser });
-  return { user: data ?? null, isLoading, refetch };
+  const me = useQuery(api.users.me);
+  return {
+    user: (me ?? null) as MeProfile | null,
+    isLoading: me === undefined,
+    // Convex queries are live — there is nothing to manually refetch. Kept for API
+    // compatibility with existing call sites; safe no-op.
+    refetch: async () => {},
+  };
 }

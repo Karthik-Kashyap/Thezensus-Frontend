@@ -29,7 +29,7 @@ export function CommunityHeader({ community }: { community: Community }) {
       <div className="grain relative h-24 bg-gradient-to-br from-primary/25 via-secondary/15 to-primary/10" />
       <div className="-mt-10 px-5 pb-5">
         <div className="flex items-end justify-between gap-4">
-          <div className="grid h-20 w-20 place-items-center overflow-hidden rounded-2xl border-4 border-card bg-primary/12 text-2xl font-semibold text-primary shadow-md">
+          <div className="grid h-20 w-20 place-items-center overflow-hidden rounded-2xl border-4 border-card bg-primary/10 text-2xl font-semibold text-primary shadow-md">
             {iconUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={iconUrl} alt={community.name} className="h-full w-full object-cover" />

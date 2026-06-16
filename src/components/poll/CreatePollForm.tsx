@@ -16,10 +16,16 @@ import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Stepper, type Step } from "@/components/ui/stepper";
+import { PollImageInput, type PollImageValue } from "./PollImageInput";
 import { cn } from "@/lib/utils";
 
 let optionSeq = 0;
-const newOption = () => ({ key: `o${optionSeq++}`, label: "" });
+type OptionRow = { key: string; label: string; image?: PollImageValue | null };
+const newOption = (): OptionRow => ({ key: `o${optionSeq++}`, label: "" });
+
+// Mirror the backend POLL_LIMITS (tagsMax / tagMax) — the create mutation re-validates.
+const MAX_TAGS = 10;
+const MAX_TAG_LEN = 40;
 
 export function CreatePollForm({ initialCommunityId }: { initialCommunityId?: string }) {
   const router = useRouter();
@@ -30,10 +36,28 @@ export function CreatePollForm({ initialCommunityId }: { initialCommunityId?: st
   const [question, setQuestion] = useState("");
   const [type, setType] = useState<PollType>("binary");
   const [ballotMode, setBallotMode] = useState<BallotMode>("standard");
-  const [options, setOptions] = useState([
-    { key: "o-a", label: "" },
-    { key: "o-b", label: "" },
+  // Default poll type is Yes / No, so the options start pre-filled to match.
+  const [options, setOptions] = useState<OptionRow[]>([
+    { key: "o-yes", label: "Yes" },
+    { key: "o-no", label: "No" },
   ]);
+  // Remembers each ballot type's options while the other type is active, so
+  // toggling between Yes / No and multiple choice restores whatever was typed.
+  const [stashedMulti, setStashedMulti] = useState<OptionRow[] | null>(null);
+  const [stashedBinary, setStashedBinary] = useState<OptionRow[] | null>(null);
+  // Optional question image (poll_question). Each option carries its own image on the row above.
+  const [questionImage, setQuestionImage] = useState<PollImageValue | null>(null);
+  // Topics — normalized to bare lowercase tokens (the "#nba" model) so they group + filter
+  // cleanly on Discover. Deduped, capped at MAX_TAGS.
+  const [tags, setTags] = useState<string[]>([]);
+  const [tagDraft, setTagDraft] = useState("");
+  // Reveal the live result breakdown on the social share card (OG image). Defaults to true —
+  // the breakdown is the viral hook; creators can keep it hidden ("vote to see") instead.
+  const [showResults, setShowResults] = useState(true);
+  // How many image pickers are mid-upload/scan. Blocks Publish until they clear, so a
+  // still-scanning image can't be silently dropped from the submitted poll (DESIGN-007).
+  const [uploadingImages, setUploadingImages] = useState(0);
+  const onImageBusyChange = (busy: boolean) => setUploadingImages((n) => n + (busy ? 1 : -1));
 
   // Communities the user can post to (their subscriptions).
   const { data: subs } = useQuery({ queryKey: ["subscriptions"], queryFn: listMySubscriptions });
@@ -52,13 +76,50 @@ export function CreatePollForm({ initialCommunityId }: { initialCommunityId?: st
   });
 
   function setType_(next: PollType) {
+    if (next === type) return;
     setType(next);
-    if (next === "binary" && options.length > 2) setOptions(options.slice(0, 2));
-    if (next === "multi" && options.length < 2) setOptions([newOption(), newOption()]);
+    if (next === "binary") {
+      // Stash the multiple-choice options, restore any earlier Yes / No edits,
+      // otherwise pre-fill with Yes / No.
+      setStashedMulti(options);
+      setOptions(
+        stashedBinary ?? [
+          { key: "o-yes", label: "Yes" },
+          { key: "o-no", label: "No" },
+        ],
+      );
+      setStashedBinary(null);
+    } else {
+      // Stash the Yes / No options, restore earlier multiple-choice options,
+      // otherwise start fresh with two blanks.
+      setStashedBinary(options);
+      setOptions(stashedMulti ?? [newOption(), newOption()]);
+      setStashedMulti(null);
+    }
   }
 
   function updateOption(key: string, label: string) {
     setOptions((os) => os.map((o) => (o.key === key ? { ...o, label } : o)));
+  }
+
+  function setOptionImage(key: string, image: PollImageValue | null) {
+    setOptions((os) => os.map((o) => (o.key === key ? { ...o, image } : o)));
+  }
+
+  function addTag(raw: string) {
+    const t = raw.trim().replace(/^#+/, "").toLowerCase().slice(0, MAX_TAG_LEN);
+    if (!t) return;
+    setTags((prev) => (prev.includes(t) || prev.length >= MAX_TAGS ? prev : [...prev, t]));
+    setTagDraft("");
+  }
+
+  function onTagKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === "Enter" || e.key === ",") {
+      e.preventDefault();
+      addTag(tagDraft);
+    } else if (e.key === "Backspace" && !tagDraft && tags.length) {
+      setTags((prev) => prev.slice(0, -1));
+    }
   }
 
   function onSubmit(e: React.FormEvent) {
@@ -72,11 +133,18 @@ export function CreatePollForm({ initialCommunityId }: { initialCommunityId?: st
       audienceType: audience,
       communityId: audience === "COMMUNITY" ? communityId : undefined,
       question: question.trim(),
+      questionMediaId: questionImage?.mediaId,
       type,
       ballotMode,
       options: options
         .filter((o) => o.label.trim())
-        .map((o, i) => ({ id: `opt_${i}`, label: o.label.trim() })),
+        .map((o, i) => ({
+          id: `opt_${i}`,
+          label: o.label.trim(),
+          ...(o.image ? { mediaId: o.image.mediaId } : {}),
+        })),
+      tags: tags.length ? tags : undefined,
+      shareCardShowResults: showResults,
     });
   }
 
@@ -176,6 +244,20 @@ export function CreatePollForm({ initialCommunityId }: { initialCommunityId?: st
               className="font-display text-lg"
             />
 
+            <div className="space-y-1.5">
+              <Label className="text-xs font-normal text-muted-foreground">
+                Question image (optional)
+              </Label>
+              <PollImageInput
+                kind="poll_question"
+                value={questionImage}
+                onChange={setQuestionImage}
+                onBusyChange={onImageBusyChange}
+                label="question image"
+                className="h-32 w-full max-w-sm"
+              />
+            </div>
+
             <div className="flex gap-2">
               <TypeChip active={type === "binary"} onClick={() => setType_("binary")} label="Yes / No" />
               <TypeChip active={type === "multi"} onClick={() => setType_("multi")} label="Multiple choice" />
@@ -192,6 +274,14 @@ export function CreatePollForm({ initialCommunityId }: { initialCommunityId?: st
                     value={o.label}
                     maxLength={120}
                     onChange={(e) => updateOption(o.key, e.target.value)}
+                  />
+                  <PollImageInput
+                    kind="poll_option"
+                    value={o.image ?? null}
+                    onChange={(v) => setOptionImage(o.key, v)}
+                    onBusyChange={onImageBusyChange}
+                    label={`image for option ${i + 1}`}
+                    className="h-10 w-10 shrink-0"
                   />
                   {canRemove && (
                     <Button
@@ -215,6 +305,45 @@ export function CreatePollForm({ initialCommunityId }: { initialCommunityId?: st
                   <Plus className="h-4 w-4" /> Add option
                 </Button>
               )}
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="tags">
+                Topics <span className="font-normal text-muted-foreground">(optional)</span>
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                Add up to {MAX_TAGS} so people can find this on Discover. Press Enter or comma.
+              </p>
+              <div className="flex flex-wrap items-center gap-2 rounded-lg border bg-background p-2 focus-within:border-primary/60">
+                {tags.map((t) => (
+                  <span
+                    key={t}
+                    className="inline-flex items-center gap-1 rounded-full bg-accent px-2.5 py-0.5 text-sm font-medium"
+                  >
+                    #{t}
+                    <button
+                      type="button"
+                      onClick={() => setTags((prev) => prev.filter((x) => x !== t))}
+                      className="text-muted-foreground hover:text-foreground"
+                      aria-label={`Remove ${t}`}
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </span>
+                ))}
+                {tags.length < MAX_TAGS && (
+                  <input
+                    id="tags"
+                    value={tagDraft}
+                    maxLength={MAX_TAG_LEN}
+                    onChange={(e) => setTagDraft(e.target.value)}
+                    onKeyDown={onTagKeyDown}
+                    onBlur={() => addTag(tagDraft)}
+                    placeholder={tags.length ? "Add another…" : "e.g. sports, nba, seattle"}
+                    className="min-w-[8rem] flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+                  />
+                )}
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -246,8 +375,39 @@ export function CreatePollForm({ initialCommunityId }: { initialCommunityId?: st
           </CardContent>
         </Card>
 
-        <Button type="submit" size="lg" disabled={mutation.isPending}>
-          {mutation.isPending ? "Publishing…" : "Publish poll"}
+        <Card>
+          <CardHeader>
+            <CardTitle>When shared</CardTitle>
+            <p className="text-sm text-muted-foreground">
+              How the preview card looks when this poll is shared on social.
+            </p>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <AudienceCard
+                active={showResults}
+                onClick={() => setShowResults(true)}
+                icon={BarChart3}
+                title="Reveal results"
+                hint="The share card shows the live vote breakdown."
+              />
+              <AudienceCard
+                active={!showResults}
+                onClick={() => setShowResults(false)}
+                icon={EyeOff}
+                title="Keep hidden"
+                hint="The card shows just the question — vote to see results."
+              />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Button type="submit" size="lg" disabled={mutation.isPending || uploadingImages > 0}>
+          {mutation.isPending
+            ? "Publishing…"
+            : uploadingImages > 0
+              ? "Processing image…"
+              : "Publish poll"}
         </Button>
       </form>
     </div>

@@ -1,0 +1,51 @@
+{
+  "count": 50,
+  "displayNames": [
+    "maya.rivers", "j_chen", "pixelpriya", "tomasz.k", "the_real_dev", "soledad",
+    "bytemercer", "ana.lucia", "grumpycoder", "ravi.menon", "northwoods", "selka",
+    "hot_take_harry", "yuki.t", "deadlinedan", "claraq", "mossandfern", "bigtuna",
+    "noor.h", "el_capitan", "saoirse_m", "tinker.tess", "quietstorm", "deniz.y",
+    "fork_and_spoon", "miloband", "groove.theory", "kasia_w", "latenightlinux", "amaraokafor",
+    "screentime_sam", "vee.codes", "halcyon", "benny_two_phones", "marisol", "drifterkai",
+    "owl.eyes", "pranav.r", "sundaytragic", "the_archivist", "fionn", "lex.moreno",
+    "midnight.snack", "gabriela", "rookie_mistake", "tahir.s", "polldancer", "ines.b",
+    "couchcritic", "wandering.wren", "static.haze", "june.bug", "offline_oliver", "nadia.k"
+  ],
+  "bios": [
+    "Professional fence-sitter. I'll vote both ways if you let me.",
+    "Here for the comment section, staying for the chaos.",
+    "I have strong opinions about weak coffee.",
+    "Ranking everything since 2009.",
+    "Will argue about pizza toppings till I die.",
+    "Mostly lurking. Occasionally devastating.",
+    "Optimist by day, poll skeptic by night.",
+    "If it can be a poll, it should be a poll.",
+    "Designer. Reluctant extrovert.",
+    "Touch grass enthusiast (in theory).",
+    "I peaked at trivia night.",
+    "Recovering hot-take addict.",
+    "Eternally team underdog.",
+    "Just here to disagree respectfully.",
+    "Collector of unpopular opinions.",
+    "Spreadsheet hobbyist. Yes, really.",
+    "Dog person. The data supports me.",
+    "I came for one vote and stayed for forty.",
+    "Chronically online, occasionally right.",
+    "My therapist knows about this account.",
+    "Snack-driven decision maker.",
+    "Reply guy in remission.",
+    "Loud about small things.",
+    "Quietly judging your bracket picks.",
+    "Two truths and a strongly held belief."
+  ],
+  "genders": [
+    "female", "female", "female", "male", "male", "male", "nonbinary", "other", "prefer_not_to_say"
+  ],
+  "regions": [
+    "US-CA", "US-NY", "US-TX", "US-WA", "US-IL", "US-FL", "GB-ENG", "CA-ON",
+    "AU-NSW", "IN-KA", "DE-BE", "BR-SP"
+  ],
+  "birthYearMin": 1968,
+  "birthYearMax": 2009,
+  "noBioFraction": 0.25
+}

@@ -1,11 +1,18 @@
-// Auth actions. Sign-in is Google OAuth handled by the backend, which sets the session cookie;
-// the frontend then re-probes the session (no client-side token storage).
+// Auth actions. Sign-in is Google OAuth handled by OUR Next.js route handlers (the old
+// auth-service's successors), which set the session cookie; the Convex client then
+// exchanges the cookie for a live token automatically (lib/convexClient).
 
-import { api, API_BASE } from "./api";
+import { clearConvexAuth } from "./convexClient";
 
-/** Top-level navigation target to begin Google sign-in (must be a real navigation, not fetch). */
-export const googleLoginUrl = `${API_BASE}/api/auth/google/start`;
+/** Top-level navigation target to begin Google sign-in (a real navigation, not fetch).
+ *  `returnTo` (a same-site path) brings the user back where they started after sign-in;
+ *  it's open-redirect-guarded server-side in the OAuth start route. */
+export function googleLoginUrl(returnTo?: string): string {
+  const base = "/api/auth/google/start";
+  return returnTo ? `${base}?returnTo=${encodeURIComponent(returnTo)}` : base;
+}
 
 export async function logout(): Promise<void> {
-  await api.post("/auth/logout");
+  await fetch("/api/auth/logout", { method: "POST" });
+  clearConvexAuth();
 }

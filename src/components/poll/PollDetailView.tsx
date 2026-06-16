@@ -2,16 +2,21 @@
 
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
+import { useQuery as useConvexQuery } from "convex/react";
 import { Repeat, EyeOff } from "lucide-react";
-import { getPoll } from "@/lib/polls";
+import { api } from "../../../convex/_generated/api";
+import type { Poll } from "@/lib/types";
 import { getCommunity } from "@/lib/communities";
 import { useSession } from "@/lib/session";
 import { routes } from "@/lib/constants";
-import { relativeTime } from "@/lib/format";
+import { relativeTime, compactNumber } from "@/lib/format";
+import { ANONYMOUS_HINT, recurrenceHint } from "@/lib/pollHints";
 import { Badge } from "@/components/ui/badge";
+import { InfoHint } from "@/components/common/InfoHint";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { VotePanel } from "./VotePanel";
+import { PollImage } from "./PollImage";
 import { ShareButton } from "./ShareButton";
 import { AnalyticsStub } from "./AnalyticsStub";
 import { CommentsSection } from "@/components/comment/CommentsSection";
@@ -20,12 +25,11 @@ import { ReportButton } from "@/components/moderation/ReportDialog";
 export function PollDetailView({ pollId, token }: { pollId: string; token?: string }) {
   const { user } = useSession();
 
-  const { data: poll, isLoading, error } = useQuery({
-    queryKey: ["poll", pollId, token ?? null],
-    queryFn: () => getPoll(pollId, token),
-    // Live-ish counts (no websockets yet): re-poll while the tab is focused.
-    refetchInterval: 5000,
-  });
+  // LIVE subscription (the 5s re-poll is gone): Convex pushes a new snapshot whenever
+  // the tally publishes fresh counts — at most once per publish interval, however hot
+  // the poll. undefined = loading, null = not found / not visible.
+  const poll = useConvexQuery(api.polls.get, { pollId, token }) as Poll | null | undefined;
+  const isLoading = poll === undefined;
 
   // Community context (name + link) when this is a community poll.
   const { data: community } = useQuery({
@@ -43,7 +47,7 @@ export function PollDetailView({ pollId, token }: { pollId: string; token?: stri
     );
   }
 
-  if (error || !poll) {
+  if (!poll) {
     return (
       <div className="mx-auto max-w-md py-20 text-center">
         <h1 className="font-display text-2xl font-semibold">Poll not found</h1>
@@ -68,24 +72,41 @@ export function PollDetailView({ pollId, token }: { pollId: string; token?: stri
         )}
         <span>·</span>
         <Link href={routes.profile(poll.creatorId)} className="hover:text-foreground">
-          {poll.creatorId.slice(0, 12)}
+          {poll.creatorDisplayName ?? poll.creatorId.slice(0, 12)}
         </Link>
         <span>·</span>
         <span>{relativeTime(poll.createdAt)}</span>
+        <span>·</span>
+        <span className="font-medium text-foreground">
+          {compactNumber(poll.currentEdition.voteCount)} votes
+        </span>
         {poll.recurrence !== "NONE" && (
-          <Badge variant="outline" className="gap-1">
-            <Repeat className="h-3 w-3" /> {poll.currentEdition.label}
-          </Badge>
+          <InfoHint content={recurrenceHint(poll.recurrence, poll.recurrenceStart, poll.recurrenceEnd)}>
+            <Badge variant="outline" className="gap-1">
+              <Repeat className="h-3 w-3" /> {poll.currentEdition.label}
+            </Badge>
+          </InfoHint>
         )}
         {poll.status === "CLOSED" && <Badge variant="outline">Closed</Badge>}
         {poll.ballotMode === "anonymous" && (
-          <Badge variant="outline" className="gap-1">
-            <EyeOff className="h-3 w-3" /> Anonymous
-          </Badge>
+          <InfoHint content={ANONYMOUS_HINT}>
+            <Badge variant="outline" className="gap-1">
+              <EyeOff className="h-3 w-3" /> Anonymous
+            </Badge>
+          </InfoHint>
         )}
         <div className="ml-auto flex items-center gap-2">
-          {(poll.audienceType === "LINK" || poll.shareToken) && (
-            <ShareButton pollId={poll.pollId} token={poll.shareToken ?? token} />
+          {/* Shareable = anything publicly viewable: every LINK poll, and any community poll
+              that isn't private (a private poll's link only resolves for members). The link
+              unfurls with the generated OG card (opengraph-image.tsx). */}
+          {!(poll.audienceType === "COMMUNITY" && poll.visibility === "private") && (
+            <ShareButton
+              pollId={poll.pollId}
+              token={poll.audienceType === "LINK" ? poll.shareToken ?? token : undefined}
+              canShareImage={poll.audienceType === "COMMUNITY" && poll.visibility !== "private"}
+              optionCount={poll.options.length}
+              imageShowsResults={poll.shareCardShowResults !== false && poll.currentEdition.voteCount > 0}
+            />
           )}
           {user && !isCreator && (
             <ReportButton
@@ -104,7 +125,15 @@ export function PollDetailView({ pollId, token }: { pollId: string; token?: stri
           <h1 className="font-display text-2xl font-semibold leading-tight tracking-tight">
             {poll.question}
           </h1>
-          <VotePanel poll={poll} token={token} />
+          <PollImage
+            mediaId={poll.questionMediaId}
+            mediaKey={poll.questionMediaKey}
+            ownerId={poll.creatorId}
+            isSelf={isCreator}
+            alt={poll.question}
+            className="max-h-96 w-full rounded-xl border"
+          />
+          <VotePanel poll={poll} token={token} liveResults />
         </CardContent>
       </Card>
 

@@ -38,8 +38,13 @@ export const RECURRENCE_OPTIONS: { value: Recurrence; label: string }[] = [
   { value: "YEARLY", label: "Yearly" },
 ];
 
-export const ACCEPTED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"] as const;
+// JPEG/PNG only — Rekognition DetectModerationLabels (the moderation gate, DESIGN-007)
+// doesn't accept WebP, so we don't accept uploads it can't scan. Re-add WebP with a
+// transcode step in the Lambda later.
+export const ACCEPTED_IMAGE_TYPES = ["image/jpeg", "image/png"] as const;
 export const MAX_AVATAR_BYTES = 5 * 1024 * 1024;
+/** Poll question/option images — larger cap than avatars (SCRATCH-009 §10.5). */
+export const MAX_POLL_IMAGE_BYTES = 10 * 1024 * 1024;
 
 /**
  * User-reportable categories for the report dialog (a subset of the backend REPORT_CATEGORY enum;

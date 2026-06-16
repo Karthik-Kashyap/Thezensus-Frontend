@@ -1,25 +1,30 @@
-// comment-service client.
+// Comments client — now Convex (api.comments.*). Same DTOs and page envelope as the
+// old comment-service; errors rethrown in the legacy { status } shape.
 
-import { api } from "./api";
+import { convex } from "./convexClient";
+import { api } from "../../convex/_generated/api";
+import { withApiError } from "./convexErrors";
 import type { Comment, Page } from "./types";
 
 export const postComment = (pollId: string, text: string, token?: string) =>
-  api.post<Comment>("/comments", { pollId, text, token });
+  withApiError(convex.mutation(api.comments.create, { pollId, text, token })) as unknown as Promise<Comment>;
 
-export const editComment = (commentId: string, pollId: string, text: string) =>
-  api.patch<Comment>(`/comments/${encodeURIComponent(commentId)}`, { pollId, text });
+export const editComment = (commentId: string, _pollId: string, text: string) =>
+  withApiError(convex.mutation(api.comments.edit, { commentId, text })) as unknown as Promise<Comment>;
 
-export const deleteComment = (commentId: string, pollId: string) =>
-  api.del<void>(`/comments/${encodeURIComponent(commentId)}?pollId=${encodeURIComponent(pollId)}`);
+export const deleteComment = (commentId: string, _pollId: string) =>
+  withApiError(convex.mutation(api.comments.remove, { commentId })) as unknown as Promise<void>;
 
 /** A poll's comment thread (newest-first, cursor-paginated). */
 export const listPollComments = (
   pollId: string,
   opts?: { token?: string; limit?: number; cursor?: string },
-) => {
-  const q = new URLSearchParams({ pollId });
-  if (opts?.token) q.set("token", opts.token);
-  if (opts?.limit) q.set("limit", String(opts.limit));
-  if (opts?.cursor) q.set("cursor", opts.cursor);
-  return api.get<Page<Comment>>(`/comments?${q.toString()}`);
-};
+) =>
+  withApiError(
+    convex.query(api.comments.listByPoll, {
+      pollId,
+      token: opts?.token,
+      limit: opts?.limit,
+      cursor: opts?.cursor,
+    }),
+  ) as unknown as Promise<Page<Comment>>;

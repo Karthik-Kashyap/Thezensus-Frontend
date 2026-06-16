@@ -1,13 +1,19 @@
-// moderation-service client — the user-facing slice only (report + appeal). The admin console
-// (queue, suspend/ban, takedown, holds) is a separate later surface.
+// Moderation client — the user-facing slice (report + appeal), now Convex. The admin
+// console surface lives in lib/admin.
 
-import { api } from "./api";
+import { convex } from "./convexClient";
+import { api } from "../../convex/_generated/api";
+import { withApiError } from "./convexErrors";
 import type { CreateReportInput } from "./types";
 
-/** POST /moderation/reports — file a report on a poll/comment/user/community. */
+/** File a report on a poll/comment/user/community. */
 export const createReport = (input: CreateReportInput) =>
-  api.post<{ reportId: string }>("/moderation/reports", input);
+  withApiError(
+    convex.mutation(api.moderation.createReport, input),
+  ) as unknown as Promise<{ reportId: string }>;
 
-/** POST /moderation/appeals — contest one's own suspended/banned status (one open at a time). */
+/** Contest one's own suspended/banned status (one open appeal at a time). */
 export const fileAppeal = (reason?: string) =>
-  api.post<{ reportId: string }>("/moderation/appeals", { reason });
+  withApiError(
+    convex.mutation(api.moderation.fileAppeal, { reason }),
+  ) as unknown as Promise<{ reportId: string }>;

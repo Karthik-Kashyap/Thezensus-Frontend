@@ -6,6 +6,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Trash2 } from "lucide-react";
 import { deleteMe } from "@/lib/profile";
+import { logout } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -35,8 +36,10 @@ export function DangerZone() {
 
   const mutation = useMutation({
     mutationFn: () => deleteMe(),
-    onSuccess: () => {
-      queryClient.setQueryData(["me"], null);
+    onSuccess: async () => {
+      // The account is severed server-side, but the session cookie + Convex token are
+      // still live — end the session explicitly or the UI stays "signed in".
+      await logout();
       queryClient.clear();
       toast.success("Your account has been deleted.");
       router.push("/");

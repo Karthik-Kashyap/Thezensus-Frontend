@@ -1,0 +1,48 @@
+{
+  "memberFractionMin": 0.55,
+  "memberFractionMax": 0.9,
+  "communities": [
+    {
+      "name": "Technology",
+      "category": "Tech",
+      "description": "Gadgets, code, AI, and the future arriving faster than we can charge our phones.",
+      "tags": ["tech", "ai", "gadgets", "software"]
+    },
+    {
+      "name": "Movies & TV",
+      "category": "Entertainment",
+      "description": "Hot takes, slow burns, and the eternal question of whether the book was better.",
+      "tags": ["movies", "tv", "streaming", "film"]
+    },
+    {
+      "name": "Food & Cooking",
+      "category": "Food",
+      "description": "What's for dinner, settled democratically. Pineapple debates encouraged.",
+      "tags": ["food", "cooking", "recipes", "restaurants"]
+    },
+    {
+      "name": "Gaming",
+      "category": "Gaming",
+      "description": "Consoles, PC, indie gems, and arguments that outlive the games themselves.",
+      "tags": ["gaming", "games", "esports", "indie"]
+    },
+    {
+      "name": "Sports",
+      "category": "Sports",
+      "description": "GOAT debates, hot takes, and very confident predictions.",
+      "tags": ["sports", "football", "basketball", "soccer"]
+    },
+    {
+      "name": "Music",
+      "category": "Music",
+      "description": "Album rankings, concert stories, and the songs you secretly love.",
+      "tags": ["music", "albums", "concerts", "playlists"]
+    },
+    {
+      "name": "Everyday Debates",
+      "category": "Lifestyle",
+      "description": "The small stuff that somehow divides everyone. Cereal before milk?",
+      "tags": ["debates", "life", "opinions", "polls"]
+    }
+  ]
+}

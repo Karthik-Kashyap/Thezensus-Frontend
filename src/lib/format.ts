@@ -28,6 +28,14 @@ export function dateTime(iso?: string): string {
   return new Date(iso).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
 }
 
+/** Absolute local date, e.g. "Jun 15, 2026" — null for empty/invalid input. */
+export function shortDate(iso?: string): string | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toLocaleDateString(undefined, { dateStyle: "medium" });
+}
+
 /** Vote count → "1.2k" style compaction. */
 export function compactNumber(n: number): string {
   if (n < 1000) return String(n);
