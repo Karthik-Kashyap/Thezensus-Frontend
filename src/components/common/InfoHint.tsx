@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
 
 const GAP = 8; // space between the trigger and the popup
@@ -29,7 +30,11 @@ export function InfoHint({
 
   // Place the popup against the trigger using measured rects + fixed positioning, so it isn't
   // clipped by any overflow-hidden ancestor and can flip/clamp to stay on-screen. Runs before
-  // paint (useLayoutEffect) to avoid a flash at the wrong spot.
+  // paint (useLayoutEffect) to avoid a flash at the wrong spot. The popup is rendered through a
+  // portal to <body> (see render below): viewport-relative coords from getBoundingClientRect only
+  // line up with `position: fixed` when no ancestor has a transform — and an ancestor with even an
+  // identity transform (e.g. a card's `animate-fade-up` resting at translateY(0)) would otherwise
+  // become the containing block and throw the popup off-screen.
   useLayoutEffect(() => {
     if (!open || !btnRef.current || !popRef.current) return;
     const t = btnRef.current.getBoundingClientRect();
@@ -102,22 +107,25 @@ export function InfoHint({
       >
         {children}
       </button>
-      {open && (
-        <span
-          ref={popRef}
-          role="tooltip"
-          onClick={(e) => e.stopPropagation()}
-          style={{
-            position: "fixed",
-            top: pos?.top ?? 0,
-            left: pos?.left ?? 0,
-            visibility: pos ? "visible" : "hidden",
-          }}
-          className="z-50 w-64 max-w-[calc(100vw-1rem)] cursor-default rounded-lg border border-border bg-popover px-3 py-2 text-left text-xs font-normal normal-case leading-relaxed text-popover-foreground shadow-lg"
-        >
-          {content}
-        </span>
-      )}
+      {open &&
+        typeof document !== "undefined" &&
+        createPortal(
+          <span
+            ref={popRef}
+            role="tooltip"
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              position: "fixed",
+              top: pos?.top ?? 0,
+              left: pos?.left ?? 0,
+              visibility: pos ? "visible" : "hidden",
+            }}
+            className="z-50 w-64 max-w-[calc(100vw-1rem)] cursor-default rounded-lg border border-border bg-popover px-3 py-2 text-left text-xs font-normal normal-case leading-relaxed text-popover-foreground shadow-lg"
+          >
+            {content}
+          </span>,
+          document.body,
+        )}
     </span>
   );
 }
