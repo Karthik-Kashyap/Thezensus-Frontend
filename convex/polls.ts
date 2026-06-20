@@ -28,6 +28,7 @@ import {
   canEditPoll,
   isHidden,
   editionView,
+  freezeSegmentSchema,
   toPollDetail,
   toFeedItem,
   homeFeedItems,
@@ -133,10 +134,14 @@ export const create = mutation({
           throw forbidden("Membership required to post in this community");
         }
       }
+      // Freeze the community's live segments onto the poll so later segment edits
+      // can't re-interpret this poll's keys (DESIGN-008). Omitted when none.
+      const segmentSchema = freezeSegmentSchema(community);
       await ctx.db.insert("polls", {
         ...base,
         communityId: input.communityId,
         visibility: input.visibility ?? DEFAULT_VISIBILITY,
+        ...(segmentSchema !== undefined ? { segmentSchema } : {}),
       });
     } else {
       // LINK poll — unlisted, token-gated, never in any feed.

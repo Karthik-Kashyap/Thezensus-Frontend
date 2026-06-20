@@ -66,8 +66,9 @@ export async function insertVoteEvent(
   optionId: string,
   delta: 1 | -1,
   dims?: string[],
+  segKey?: string,
 ): Promise<void> {
-  await ctx.db.insert("voteEvents", { ballotKey, optionId, delta, dims });
+  await ctx.db.insert("voteEvents", { ballotKey, optionId, delta, dims, segKey });
 }
 
 /** One watermark-bounded page of the tally feed, oldest-first. */

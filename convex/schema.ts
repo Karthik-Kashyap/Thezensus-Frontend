@@ -27,11 +27,16 @@ const consentPurpose = v.union(
   v.literal("age_13plus"),
 );
 const consentSource = v.union(v.literal("signup"), v.literal("settings"), v.literal("reconsent"));
+// Positional, append-only segment shape (DESIGN-008). A segment keeps its `pos` for
+// life and option `i`s are never reordered/renumbered, so a positional segKey like
+// "2.1.0.0.0" means the same thing forever. Retire via `archived`, never delete.
 const segmentDef = v.object({
   id: v.string(),
   label: v.string(),
-  options: v.array(v.string()),
+  pos: v.number(), // append-only position, 1-based
+  options: v.array(v.object({ i: v.number(), label: v.string() })), // append-only option index + display label
   version: v.optional(v.number()),
+  archived: v.optional(v.boolean()), // retire, never delete
 });
 
 export default defineSchema({
@@ -73,6 +78,7 @@ export default defineSchema({
     bio: v.optional(v.string()),
     avatarMediaId: v.optional(v.string()),
     avatarKey: v.optional(v.string()), // denormalized READY serving key, one-hop render
+    tier: v.optional(v.union(v.literal("free"), v.literal("pro"))), // absent ⇒ free; the slicing paywall lever (DESIGN-008)
   }),
 
   /** Public counters. Separate doc so stat bumps never OCC-contend with profile edits. */
@@ -247,6 +253,9 @@ export default defineSchema({
      *  Absent ⇒ reveal (the default); false ⇒ the card stays question-only. Display-only —
      *  never gates the poll page itself. */
     shareCardShowResults: v.optional(v.boolean()),
+    /** Frozen copy of the community's segments at poll-create time (DESIGN-008). Immune to
+     *  later community-segment edits — it's what turns a positional segKey back into labels. */
+    segmentSchema: v.optional(v.array(segmentDef)),
     currentEdition: v.optional(v.string()), // memoized label — cache, not source of truth
     modStatus: v.optional(v.string()), // OK | TAKEN_DOWN (platform takedown)
     takedownReportId: v.optional(v.string()),
@@ -317,6 +326,7 @@ export default defineSchema({
     optionId: v.string(),
     delta: v.number(), // +1 cast / −1 the old option on change
     dims: v.optional(v.array(v.string())),
+    segKey: v.optional(v.string()), // positional segment key, e.g. "2.1.0.0.0"; identity-free (option indices only)
   }).index("by_ballot", ["ballotKey"]),
 
   /** What every viewer subscribes to — one push per publish interval, regardless of
@@ -325,6 +335,7 @@ export default defineSchema({
     ballotKey: v.string(),
     counts: v.record(v.string(), v.number()), // optionId → count
     dimCounts: v.optional(v.record(v.string(), v.record(v.string(), v.number()))), // "dim#value" → optionId → count
+    crosstab: v.optional(v.record(v.string(), v.record(v.string(), v.number()))), // segKey → optionId → count (the combinable joint table)
     totalVotes: v.number(),
     publishedAt: v.number(),
   }).index("by_ballot", ["ballotKey"]),
@@ -340,6 +351,7 @@ export default defineSchema({
     watermark: v.number(), // last folded voteEvents._creationTime; 0 = from the beginning
     counts: v.record(v.string(), v.number()),
     dimCounts: v.optional(v.record(v.string(), v.record(v.string(), v.number()))),
+    crosstab: v.optional(v.record(v.string(), v.record(v.string(), v.number()))), // segKey → optionId → count (running sums)
     totalVotes: v.number(),
   }).index("by_ballot", ["ballotKey"]),
 
@@ -352,6 +364,7 @@ export default defineSchema({
   tallyRegistry: defineTable({
     ballotKey: v.string(),
     pollId: v.string(),
+    pendingUntil: v.optional(v.number()), // reserved for the wake-on-vote scheduler (DESIGN-008, deferred) — no logic this turn
   }).index("by_ballot", ["ballotKey"]),
 
   // ── Comments (Phase 3) ────────────────────────────────────────────────────

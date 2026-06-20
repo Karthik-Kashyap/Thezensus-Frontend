@@ -10,9 +10,9 @@ import {
   POLL_STATUS,
   EDITION_STATUS,
   TALLY_DIMENSION,
-  SEGMENT_DIM_PREFIX,
   dimKey,
 } from "./constants/poll";
+import { bucketAge, buildSegKey } from "./slicing.logic";
 import { currentEditionLabel, windowState } from "./editions.logic";
 import { badRequest, notFound, forbidden, conflict } from "./errors";
 import { isMember, isOwnerOrMod, isBannedFromCommunity, getSubscription } from "./communities.model";
@@ -119,15 +119,31 @@ export async function demographicsSnapshot(
   return Object.keys(snapshot).length > 0 ? snapshot : undefined;
 }
 
-/** Flatten a snapshot to the voteEvents dim keys the tally folds ("gender#female", …). */
+/**
+ * Flatten a snapshot to the voteEvents demographic MARGINAL dim keys the tally folds
+ * ("gender#female", "age#25-34", "region#US-CA"). Age is BUCKETED (DESIGN-008) so the
+ * marginal stays low-cardinality. Segments are NOT mixed in here — they live in segKey
+ * (see `voteSegKey`); keeping them out keeps `dims` identity-free demographic buckets only.
+ */
 export function toDims(snapshot: DemographicsSnapshot | undefined): string[] | undefined {
   if (!snapshot) return undefined;
   const dims: string[] = [];
   if (snapshot.gender !== undefined) dims.push(dimKey(TALLY_DIMENSION.GENDER, snapshot.gender));
-  if (snapshot.ageAtVote !== undefined) dims.push(dimKey(TALLY_DIMENSION.AGE, String(snapshot.ageAtVote)));
-  if (snapshot.region !== undefined) dims.push(dimKey(TALLY_DIMENSION.REGION, snapshot.region));
-  for (const [segId, answer] of Object.entries(snapshot.segments ?? {})) {
-    dims.push(dimKey(`${SEGMENT_DIM_PREFIX}${segId}`, answer));
+  if (snapshot.ageAtVote !== undefined) {
+    dims.push(dimKey(TALLY_DIMENSION.AGE, bucketAge(snapshot.ageAtVote)));
   }
+  if (snapshot.region !== undefined) dims.push(dimKey(TALLY_DIMENSION.REGION, snapshot.region));
   return dims.length > 0 ? dims : undefined;
+}
+
+/**
+ * Build the positional, identity-free segment key for a vote from the voter's snapshotted
+ * segment answers and the poll's frozen segmentSchema. Returns undefined when there's no
+ * snapshot, no answers, or the poll carries no schema (LINK / pre-DESIGN-008 polls).
+ */
+export function voteSegKey(
+  snapshot: DemographicsSnapshot | undefined,
+  poll: Doc<"polls">,
+): string | undefined {
+  return buildSegKey(snapshot?.segments ?? {}, poll.segmentSchema ?? []);
 }

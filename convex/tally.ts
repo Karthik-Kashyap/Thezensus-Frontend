@@ -10,6 +10,7 @@ import { internalMutation } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { POLL_STATUS, TALLY_PAGE_SIZE } from "./lib/constants/poll";
 import { currentEditionLabel } from "./lib/editions.logic";
+import { foldCrosstabEvent } from "./lib/slicing.logic";
 import { getPoll } from "./lib/polls.model";
 import {
   listRegistry,
@@ -60,6 +61,7 @@ export const runOne = internalMutation({
 
     const counts: Record<string, number> = { ...(state?.counts ?? {}) };
     const dimCounts: Record<string, Record<string, number>> = { ...(state?.dimCounts ?? {}) };
+    const crosstab: Record<string, Record<string, number>> = { ...(state?.crosstab ?? {}) };
     let totalVotes = state?.totalVotes ?? 0;
 
     for (const event of page) {
@@ -69,19 +71,20 @@ export const runOne = internalMutation({
         const perOption = (dimCounts[dim] ??= {});
         perOption[event.optionId] = (perOption[event.optionId] ?? 0) + event.delta;
       }
+      if (event.segKey) foldCrosstabEvent(crosstab, event.segKey, event.optionId, event.delta);
     }
     const newWatermark = page[page.length - 1]._creationTime;
 
     // Query-snapshot → blind-write: nothing here was written by the vote path, so this
     // can never OCC-conflict with voting.
     if (state) {
-      await ctx.db.patch(state._id, { watermark: newWatermark, counts, dimCounts, totalVotes });
+      await ctx.db.patch(state._id, { watermark: newWatermark, counts, dimCounts, crosstab, totalVotes });
     } else {
-      await ctx.db.insert("tallyState", { ballotKey, watermark: newWatermark, counts, dimCounts, totalVotes });
+      await ctx.db.insert("tallyState", { ballotKey, watermark: newWatermark, counts, dimCounts, crosstab, totalVotes });
     }
 
     const published = await getResults(ctx, ballotKey);
-    const doc = { ballotKey, counts, dimCounts, totalVotes, publishedAt: Date.now() };
+    const doc = { ballotKey, counts, dimCounts, crosstab, totalVotes, publishedAt: Date.now() };
     if (published) {
       await ctx.db.patch(published._id, doc);
     } else {

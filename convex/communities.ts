@@ -167,7 +167,9 @@ export const update = mutation({
     if (input.tags !== undefined) patch.tags = input.tags;
     if (input.category !== undefined) patch.category = input.category;
     if (input.visibility !== undefined) patch.visibility = input.visibility;
-    if (input.segments !== undefined) patch.segments = validateSegments(input.segments);
+    // Pass the community's PRIOR segments so positions + option indices are preserved
+    // (append-only) and omitted segments are retired, not dropped (DESIGN-008 §A).
+    if (input.segments !== undefined) patch.segments = validateSegments(input.segments, community.segments);
 
     if (input.iconMediaId !== undefined) {
       const media = await getMedia(ctx, community.communityId, input.iconMediaId);

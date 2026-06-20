@@ -71,6 +71,8 @@ export function toMe(
       until: moderation?.until,
     },
     isAdmin: admin,
+    // Slicing paywall tier (DESIGN-008): gates how many segments can be combined. Absent ⇒ free.
+    ...(profile?.tier ? { tier: profile.tier } : {}),
   };
 }
 

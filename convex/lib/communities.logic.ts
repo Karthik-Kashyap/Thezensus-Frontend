@@ -42,6 +42,11 @@ export function validateCommunityTagsCategory(tags?: string[], category?: string
   }
 }
 
+/**
+ * What the owner SENDS: option *label strings* only. The positional `pos` and option
+ * `i` indices that make a segKey stable forever (DESIGN-008) are assigned by the
+ * backend in `validateSegments` — clients never choose them.
+ */
 export interface SegmentDefInput {
   id: string;
   label: string;
@@ -49,13 +54,49 @@ export interface SegmentDefInput {
   version?: number;
 }
 
-/** Owner-defined member questions: 8 dims max, 2–12 options each, unique ids. */
-export function validateSegments(segments: SegmentDefInput[]): SegmentDefInput[] {
-  if (segments.length > COMMUNITY_LIMITS.segmentDimensionsMax) {
+/** The stored, positional, append-only segment shape (schema `segmentDef`; mirrors
+ *  SegmentSchemaEntry in slicing.logic.ts). `pos` and option `i` are append-only and
+ *  never reused; retired segments stay with `archived: true`. */
+export interface StoredSegmentDef {
+  id: string;
+  label: string;
+  pos: number;
+  options: { i: number; label: string }[];
+  version?: number;
+  archived?: boolean;
+}
+
+/**
+ * Validate + MERGE owner-defined member questions into the stored, append-only shape
+ * (DESIGN-008 §A). APPEND-ONLY: a segment keeps its `pos` for life and option `i`s are
+ * never reordered/renumbered, so a positional segKey like "2.1.0.0.0" means the same
+ * thing forever. The merge is against `prior` (the community's current segments):
+ *   - id in BOTH  → preserve `pos`; reuse each prior option's `i` for labels that still
+ *                   appear (match by label), append genuinely-new labels at max(i)+1;
+ *                   update label text if changed.
+ *   - NEW id      → assign pos = max(prior pos)+1 (1-based, never a retired slot); i = 1..n.
+ *   - prior id MISSING from incoming → keep it as `archived: true` (retain pos+options) so
+ *                   old polls' frozen schemas can still resolve labels — never dropped.
+ * Limits (lib/constants/community.ts): ≤5 ACTIVE segments, ≤4 options each (DESIGN-008); the
+ * dimension cap counts incoming (non-archived) segments only — archived/retired don't count.
+ */
+export function validateSegments(
+  incoming: SegmentDefInput[],
+  prior?: StoredSegmentDef[],
+): StoredSegmentDef[] {
+  // Count the dimension cap against ACTIVE incoming segments only (archived don't count).
+  if (incoming.length > COMMUNITY_LIMITS.segmentDimensionsMax) {
     throw badRequest(`At most ${COMMUNITY_LIMITS.segmentDimensionsMax} member questions`);
   }
+
+  const priorById = new Map((prior ?? []).map((p) => [p.id, p]));
+  // Highest pos ever used (incl. archived) — new positions only ever go up from here.
+  let maxPos = (prior ?? []).reduce((m, p) => Math.max(m, p.pos), 0);
+
   const ids = new Set<string>();
-  return segments.map((s) => {
+  const merged: StoredSegmentDef[] = [];
+
+  for (const s of incoming) {
     const id = s.id.trim();
     const label = s.label.trim();
     if (id.length < 1 || id.length > COMMUNITY_LIMITS.segmentIdMax) throw badRequest("Invalid segment id");
@@ -70,16 +111,59 @@ export function validateSegments(segments: SegmentDefInput[]): SegmentDefInput[]
         `Segments need ${COMMUNITY_LIMITS.segmentOptionsMin}–${COMMUNITY_LIMITS.segmentOptionsMax} options`,
       );
     }
-    const options = s.options.map((o) => {
+    const optionLabels = s.options.map((o) => {
       const t = o.trim();
       if (t.length < 1 || t.length > COMMUNITY_LIMITS.segmentOptionMax) throw badRequest("Invalid segment option");
       return t;
     });
-    return { id, label, options, version: s.version ?? 1 };
-  });
+    // Option labels must be unique within a segment — they're how we match prior `i`s.
+    if (new Set(optionLabels).size !== optionLabels.length) {
+      throw badRequest("Segment options must be unique");
+    }
+
+    const existing = priorById.get(id);
+    if (existing) {
+      // Preserve the segment's pos. Reuse prior option `i`s by label; append new labels
+      // at the next unused index (max prior i + 1), never reusing a retired `i`.
+      const priorByLabel = new Map(existing.options.map((o) => [o.label, o]));
+      let nextI = existing.options.reduce((m, o) => Math.max(m, o.i), 0) + 1;
+      const options = optionLabels.map((lbl) => {
+        const po = priorByLabel.get(lbl);
+        return po ? { i: po.i, label: lbl } : { i: nextI++, label: lbl };
+      });
+      merged.push({
+        id,
+        label, // label text may change (cosmetic; the `i` is what's stored on votes)
+        pos: existing.pos,
+        options,
+        version: s.version ?? existing.version,
+      });
+    } else {
+      // Brand-new segment: next free position, fresh 1-based option indices.
+      merged.push({
+        id,
+        label,
+        pos: ++maxPos,
+        options: optionLabels.map((lbl, idx) => ({ i: idx + 1, label: lbl })),
+        version: s.version ?? 1,
+      });
+    }
+  }
+
+  // Retire (don't drop) any prior segment the owner left out, retaining pos + options so
+  // old polls can still resolve their frozen segKeys back to labels.
+  for (const p of prior ?? []) {
+    if (!ids.has(p.id)) merged.push({ ...p, archived: true });
+  }
+
+  return merged;
 }
 
-/** Validate a member's segment answers against the community's definitions. */
+/**
+ * Validate a member's segment answers against the community's CURRENT (non-archived)
+ * definitions. Answers are option *label* strings (subscriptions store
+ * `Record<segmentId, answerLabel>`). Reject answers for archived or unknown segments.
+ */
 export function validateSegmentAnswers(
   community: Doc<"communities">,
   answers: Record<string, string>,
@@ -87,8 +171,8 @@ export function validateSegmentAnswers(
   const defs = new Map((community.segments ?? []).map((s) => [s.id, s]));
   for (const [id, answer] of Object.entries(answers)) {
     const def = defs.get(id);
-    if (!def) throw badRequest(`Unknown segment '${id}'`);
-    if (!def.options.includes(answer)) {
+    if (!def || def.archived) throw badRequest(`Unknown segment '${id}'`);
+    if (!def.options.some((o) => o.label === answer)) {
       throw badRequest(`Invalid option '${answer}' for segment '${id}'`);
     }
   }
@@ -118,7 +202,9 @@ export async function toCommunityDetail(
     ...(community.tags !== undefined ? { tags: community.tags } : {}),
     ...(community.category !== undefined ? { category: community.category } : {}),
     ...(community.rules !== undefined ? { rules: community.rules } : {}),
-    segments: community.segments ?? [],
+    // Expose only ACTIVE segments to clients (the editor + answer UI); archived defs stay
+    // in storage so old polls' frozen schemas can still resolve labels (DESIGN-008 §A).
+    segments: (community.segments ?? []).filter((s) => !s.archived),
     pinnedPollIds: pins.map((p) => p.pollId),
     ...(role ? { myRole: role.role } : {}),
   };

@@ -9,7 +9,7 @@ import type { Poll } from "@/lib/types";
 import { getCommunity } from "@/lib/communities";
 import { useSession } from "@/lib/session";
 import { routes } from "@/lib/constants";
-import { relativeTime, compactNumber } from "@/lib/format";
+import { relativeTime } from "@/lib/format";
 import { ANONYMOUS_HINT, recurrenceHint } from "@/lib/pollHints";
 import { Badge } from "@/components/ui/badge";
 import { InfoHint } from "@/components/common/InfoHint";
@@ -18,7 +18,10 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { VotePanel } from "./VotePanel";
 import { PollImage } from "./PollImage";
 import { ShareButton } from "./ShareButton";
+import { DeletePollButton } from "./DeletePollButton";
+import { VoteCount } from "./VoteCount";
 import { AnalyticsStub } from "./AnalyticsStub";
+import { SlicePanel } from "./SlicePanel";
 import { CommentsSection } from "@/components/comment/CommentsSection";
 import { ReportButton } from "@/components/moderation/ReportDialog";
 
@@ -59,6 +62,9 @@ export function PollDetailView({ pollId, token }: { pollId: string; token?: stri
   }
 
   const isCreator = user?.linkId === poll.creatorId;
+  // Creator or a community owner/mod may delete (mirrors canEditPoll on the backend, which the
+  // remove mutation re-checks). myRole is present on the community DTO only for owners/mods.
+  const canDelete = isCreator || community?.myRole === "OWNER" || community?.myRole === "MODERATOR";
 
   return (
     <div className="mx-auto max-w-2xl">
@@ -77,9 +83,7 @@ export function PollDetailView({ pollId, token }: { pollId: string; token?: stri
         <span>·</span>
         <span>{relativeTime(poll.createdAt)}</span>
         <span>·</span>
-        <span className="font-medium text-foreground">
-          {compactNumber(poll.currentEdition.voteCount)} votes
-        </span>
+        <VoteCount count={poll.currentEdition.voteCount} className="font-medium text-foreground" />
         {poll.recurrence !== "NONE" && (
           <InfoHint content={recurrenceHint(poll.recurrence, poll.recurrenceStart, poll.recurrenceEnd)}>
             <Badge variant="outline" className="gap-1">
@@ -117,6 +121,7 @@ export function PollDetailView({ pollId, token }: { pollId: string; token?: stri
               variant="inline"
             />
           )}
+          {canDelete && <DeletePollButton pollId={poll.pollId} communityId={poll.communityId} />}
         </div>
       </div>
 
@@ -136,6 +141,12 @@ export function PollDetailView({ pollId, token }: { pollId: string; token?: stri
           <VotePanel poll={poll} token={token} liveResults />
         </CardContent>
       </Card>
+
+      {poll.segmentSchema && poll.segmentSchema.length > 0 && (
+        <div className="mt-6">
+          <SlicePanel poll={poll} token={token} />
+        </div>
+      )}
 
       {isCreator && (
         <div className="mt-6">

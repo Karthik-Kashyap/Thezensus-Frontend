@@ -47,6 +47,9 @@ export interface MeProfile {
   /** Platform admin (holds the `ADMIN` item). Gates the admin/moderation console in the UI; the
    *  moderation-service still enforces per request. Optional so a pre-rebuild backend reads as false. */
   isAdmin?: boolean;
+  /** Subscription tier; gates how many segments can be combined when slicing results
+   *  (free = 2, pro = 5). Absent ⇒ free. */
+  tier?: "free" | "pro";
 }
 
 /** Another user's public profile (no settings/email/age; demographics only if public). */
@@ -220,6 +223,37 @@ export interface Poll {
   shareCardShowResults?: boolean;
   createdAt: string;
   currentEdition: EditionScoreboard;
+  /** Frozen community segments this poll's results can be sliced by (DESIGN-008). Absent for
+   *  LINK polls and community polls with no segments. */
+  segmentSchema?: SegmentSchemaEntry[];
+}
+
+/** One frozen segment dimension on a poll (DESIGN-008): stable position + append-only option
+ *  indices/labels. The slice panel builds its chips + value pickers from these. */
+export interface SegmentSchemaEntry {
+  id: string;
+  label: string;
+  pos: number;
+  options: { i: number; label: string }[];
+  version?: number;
+  archived?: boolean;
+}
+
+/** One cross-tab cell from `api.slices.getSlice`: a segment-value combination + its per-option
+ *  counts. `values` maps segmentId → the chosen option's label. */
+export interface SliceCell {
+  values: Record<string, string>;
+  counts: Record<string, number>;
+  total: number;
+}
+
+/** The paywalled slice result: the selected dimensions + the surviving (k≥5) cells. */
+export interface SliceResult {
+  pollId: string;
+  edition: string;
+  dims: { id: string; label: string }[];
+  cells: SliceCell[];
+  suppressedBelow: number;
 }
 
 /**

@@ -15,6 +15,7 @@ import { InfoHint } from "@/components/common/InfoHint";
 import { SubscribeButton } from "@/components/community/SubscribeButton";
 import { VotePanel } from "./VotePanel";
 import { PollImage } from "./PollImage";
+import { VoteCount } from "./VoteCount";
 
 /**
  * A poll in a feed — votable in place: the options are clickable and casting shows live results
@@ -69,7 +70,7 @@ export function PollCard({
           </InfoHint>
         )}
         <span className="ml-auto inline-flex items-center gap-2">
-          <span>{compactNumber(poll.currentEdition.voteCount)} votes</span>
+          <VoteCount count={poll.currentEdition.voteCount} />
           <span aria-hidden className="opacity-50">·</span>
           <span>{relativeTime(poll.createdAt)}</span>
         </span>

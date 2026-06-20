@@ -22,9 +22,9 @@ export const COMMUNITY_LIMITS = {
   tagsMax: 10,
   tagMax: 40,
   categoryMax: 40,
-  segmentDimensionsMax: 8,
+  segmentDimensionsMax: 5, // DESIGN-008: ≤5 ACTIVE segments (5×4 = 1024-row cross-tab budget)
   segmentOptionsMin: 2,
-  segmentOptionsMax: 12,
+  segmentOptionsMax: 4, // DESIGN-008: ≤4 options each (keeps ∏ options ≤ CROSSTAB_ROW_BUDGET)
   segmentIdMax: 40,
   segmentLabelMax: 120,
   segmentOptionMax: 60,

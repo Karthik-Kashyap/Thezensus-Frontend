@@ -278,6 +278,11 @@ export async function toPollDetail(
     ...(creatorIsMember !== undefined ? { creatorIsMember } : {}),
     ...(isCreator && poll.shareToken !== undefined ? { shareToken: poll.shareToken } : {}),
     currentEdition: edition,
+    // Frozen segments so the client can render the slice panel's chips + value pickers
+    // (DESIGN-008). Just labels/options — the vote counts stay behind the paywalled getSlice.
+    ...(poll.segmentSchema && poll.segmentSchema.length > 0
+      ? { segmentSchema: poll.segmentSchema }
+      : {}),
   };
 }
 
@@ -430,6 +435,33 @@ export async function discoverFeedItems(
     : scored;
   const items = await buildFeedItems(ctx, matching, limit);
   return { items, tags };
+}
+
+// ── Segment schema freeze (DESIGN-008 §A) ───────────────────────────────────
+
+/** A poll's frozen segment schema entry — the immutable copy of a community segment
+ *  taken at poll-create time. Drops `archived` (a frozen schema only carries live
+ *  segments) but keeps the positional `pos`/option `i`s that a segKey decodes against. */
+export type FrozenSegment = NonNullable<Doc<"polls">["segmentSchema"]>[number];
+
+/**
+ * Freeze a community's segments onto a new poll (DESIGN-008): copy the **non-archived**
+ * segments into an immutable schema so later community-segment edits/retirements can never
+ * re-interpret this poll's positional segKeys. Preserves `id`, `label`, `pos`, `options`
+ * ({i,label}) and `version`; excludes retired segments. Returns `undefined` when the community
+ * has no live segments so the create handler can omit `segmentSchema` entirely.
+ */
+export function freezeSegmentSchema(community: Doc<"communities">): FrozenSegment[] | undefined {
+  const frozen = (community.segments ?? [])
+    .filter((s) => !s.archived)
+    .map((s) => ({
+      id: s.id,
+      label: s.label,
+      pos: s.pos,
+      options: s.options.map((o) => ({ i: o.i, label: o.label })),
+      ...(s.version !== undefined ? { version: s.version } : {}),
+    }));
+  return frozen.length > 0 ? frozen : undefined;
 }
 
 /** True when `visibility` would let a non-member viewer see a community poll in a feed. */

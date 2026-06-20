@@ -5,7 +5,7 @@ import { shortDate } from "./format";
 import type { Recurrence } from "./types";
 
 export const ANONYMOUS_HINT =
-  "Anonymous poll: your vote is counted but never linked to your account. There's no demographic breakdown, and you can't change your vote after casting.";
+  "Anonymous poll: your vote is counted but isn't included in any demographic breakdown, and you can't change your vote after casting.";
 
 /** What each cadence means in plain words (no time-of-day cadence exists — daily is the finest). */
 const CADENCE: Record<Recurrence, string> = {

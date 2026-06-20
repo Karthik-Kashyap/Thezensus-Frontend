@@ -33,6 +33,7 @@ import {
 import { currentEditionLabel, computeEditionLabel, isTimeBased } from "./lib/editions.logic";
 import { getPoll, ensureEdition } from "./lib/polls.model";
 import { getCommunity } from "./lib/communities.model";
+import { validateSegments } from "./lib/communities.logic";
 import { demographicsSnapshot, toDims } from "./lib/votes.logic";
 import { insertVote, insertVoteEvent, ensureRegistered } from "./lib/votes.model";
 
@@ -167,7 +168,9 @@ export const seedCommunities = mutation({
           ...(c.tags ? { tags: c.tags } : {}),
           ...(c.category ? { category: c.category } : {}),
           ...(c.rules ? { rules: c.rules } : {}),
-          ...(c.segments ? { segments: c.segments } : {}),
+          // c.segments carries option label strings; run through validateSegments (no prior
+          // — fresh community) to assign the append-only pos + option `i` (DESIGN-008 §A).
+          ...(c.segments ? { segments: validateSegments(c.segments) } : {}),
           createdBy: c.ownerLinkId,
         });
         await ctx.db.insert("communityRoles", {

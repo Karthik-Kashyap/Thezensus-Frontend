@@ -17,6 +17,7 @@ import {
   assertValidOption,
   demographicsSnapshot,
   toDims,
+  voteSegKey,
 } from "./lib/votes.logic";
 import {
   getVote,
@@ -69,6 +70,7 @@ export const cast = mutation({
         return { status: "alreadyVoted", pollId: poll.pollId, edition: label, optionId: existing.optionId };
       }
       const snapshot = await demographicsSnapshot(ctx, actor!.linkId, poll);
+      const segKey = voteSegKey(snapshot, poll);
       await insertVote(ctx, {
         ballotKey: bKey,
         voter: actor!.linkId,
@@ -77,7 +79,7 @@ export const cast = mutation({
         linkId: actor!.linkId,
         ...(snapshot ? { demographics: snapshot } : {}),
       });
-      await insertVoteEvent(ctx, bKey, optionId, 1, toDims(snapshot));
+      await insertVoteEvent(ctx, bKey, optionId, 1, toDims(snapshot), segKey);
     } else {
       // Guest or anonymous-ballot vote: fresh random voter id, never dedups, no
       // identity, no demographics (unlinkable by construction).
@@ -124,11 +126,12 @@ export const change = mutation({
     }
 
     // Move: patch the voter-owned row; emit −old/+new deltas carrying the ROW'S
-    // snapshotted dims (interim demographic edits never rewrite history).
+    // snapshotted dims + segKey (interim demographic edits never rewrite history).
     const dims = toDims(existing.demographics);
+    const segKey = voteSegKey(existing.demographics, poll);
     await changeVoteRow(ctx, existing, optionId);
-    await insertVoteEvent(ctx, bKey, existing.optionId, -1, dims);
-    await insertVoteEvent(ctx, bKey, optionId, 1, dims);
+    await insertVoteEvent(ctx, bKey, existing.optionId, -1, dims, segKey);
+    await insertVoteEvent(ctx, bKey, optionId, 1, dims, segKey);
 
     return { status: "changed", pollId: poll.pollId, edition: label, optionId };
   },
