@@ -33,10 +33,14 @@ export function VotePanel({
   poll,
   token,
   liveResults = false,
+  onVoted,
 }: {
   poll: VotablePoll;
   token?: string;
   liveResults?: boolean;
+  /** Called after a successful cast/change. Feed cards use it to pin the card (DESIGN-010)
+   *  so the voter keeps watching live results; unused on the detail page. */
+  onVoted?: () => void;
 }) {
   const { user } = useSession();
   const [changing, setChanging] = useState(false);
@@ -85,6 +89,7 @@ export function VotePanel({
       if (r.status === "alreadyVoted") toast.info("You’ve already voted on this one.");
       else if (liveResults) setOverlay({ baseline: edition.publishedAt ?? null, prev: ctx?.prev ?? null });
       setJustVotedId(r.optionId);
+      onVoted?.();
     },
     onError: (e) => {
       const s = (e as { status?: number }).status;
@@ -101,6 +106,7 @@ export function VotePanel({
         setOverlay({ baseline: edition.publishedAt ?? null, prev: ctx?.prev ?? null });
       }
       setJustVotedId(r.optionId);
+      onVoted?.();
     },
     onError: () => toast.error("Couldn’t change your vote."),
   });

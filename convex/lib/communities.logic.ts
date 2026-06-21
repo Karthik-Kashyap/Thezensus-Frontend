@@ -204,7 +204,16 @@ export async function toCommunityDetail(
     ...(community.rules !== undefined ? { rules: community.rules } : {}),
     // Expose only ACTIVE segments to clients (the editor + answer UI); archived defs stay
     // in storage so old polls' frozen schemas can still resolve labels (DESIGN-008 §A).
-    segments: (community.segments ?? []).filter((s) => !s.archived),
+    // Map the stored positional shape (options: {i, label}[]) back to the client contract
+    // (options: string[] labels) — the `i`/`pos` indices are backend-internal (DESIGN-008).
+    segments: (community.segments ?? [])
+      .filter((s) => !s.archived)
+      .map((s) => ({
+        id: s.id,
+        label: s.label,
+        options: s.options.map((o) => o.label),
+        ...(s.version !== undefined ? { version: s.version } : {}),
+      })),
     pinnedPollIds: pins.map((p) => p.pollId),
     ...(role ? { myRole: role.role } : {}),
   };

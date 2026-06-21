@@ -135,6 +135,26 @@ export const MOD_ACTION_LABELS: Record<ModActionType, string> = {
   WARN_REPORTER: "Warned reporter",
 };
 
+/**
+ * Live feed vote counts (DESIGN-010). Viewport-gated, counts-only, hard-capped live
+ * subscriptions on feed cards. OFF by default — set NEXT_PUBLIC_LIVE_FEED_COUNTS=1 to
+ * enable. With it off, PollCard behaves exactly as before (static snapshot counts).
+ */
+export const LIVE_FEED = {
+  // Accept 1/true/yes/on (any case) — avoids the "I set it to `true` but it read as off" trap.
+  enabled: ["1", "true", "yes", "on"].includes(
+    (process.env.NEXT_PUBLIC_LIVE_FEED_COUNTS ?? "").trim().toLowerCase(),
+  ),
+  /** Hard cap on concurrent NORMAL slots. Pins (just-voted) are extra + viewport-bound. */
+  maxLiveCards: 4,
+  /** Continuous on-screen time before a card subscribes (fast scroll opens nothing). */
+  dwellMs: 2000,
+  /** Delay before releasing a slot on scroll-out — anti-thrash on the viewport edge. */
+  exitGraceMs: 750,
+  /** "In view" = at least this fraction of the card OR of the viewport is covered. */
+  visibleFraction: 0.5,
+} as const;
+
 /** Member-question (segment) editor limits — mirrors COMMUNITY_LIMITS in community-service. */
 export const SEGMENT_LIMITS = {
   questionsMax: 8,

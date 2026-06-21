@@ -12,3 +12,5 @@ next-env.d.ts
 # Local agent/editor tooling state (machine-specific)
 .claude/
 .agents/
+
+.vercel

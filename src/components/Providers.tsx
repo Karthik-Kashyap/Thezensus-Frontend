@@ -6,6 +6,7 @@ import { ThemeProvider } from "next-themes";
 import { Toaster } from "sonner";
 import { useState } from "react";
 import { convex } from "@/lib/convexClient";
+import { LiveSlotProvider } from "@/components/feed/LiveSlotProvider";
 
 /**
  * App-wide client providers: Convex (live backend), server-state cache, theme, toasts.
@@ -19,10 +20,12 @@ export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <ConvexProvider client={convex}>
       <QueryClientProvider client={client}>
-        <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
-          {children}
-          <Toaster position="bottom-right" richColors closeButton />
-        </ThemeProvider>
+        <LiveSlotProvider>
+          <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+            {children}
+            <Toaster position="bottom-right" richColors closeButton />
+          </ThemeProvider>
+        </LiveSlotProvider>
       </QueryClientProvider>
     </ConvexProvider>
   );

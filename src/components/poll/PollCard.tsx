@@ -2,9 +2,12 @@
 
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
+import { useQuery as useConvexQuery } from "convex/react";
 import { MessageSquare, Repeat, Users, EyeOff } from "lucide-react";
+import { api } from "../../../convex/_generated/api";
 import type { PollListItem } from "@/lib/types";
 import { getCommunity } from "@/lib/communities";
+import { useLiveSlot } from "@/components/feed/LiveSlotProvider";
 import { useSession } from "@/lib/session";
 import { routes } from "@/lib/constants";
 import { relativeTime, compactNumber } from "@/lib/format";
@@ -31,6 +34,29 @@ export function PollCard({
   showJoinCta?: boolean;
 }) {
   const { user } = useSession();
+
+  // Live vote counts while this card is on screen (DESIGN-010): the slot manager grants a
+  // subscription only after the card dwells and stays within the 4-card cap (or it's pinned
+  // by the viewer's own vote). Off-screen / over-cap → isLive false → "skip" → no subscription,
+  // and the card renders its feed snapshot exactly as before. We overlay the live counts onto
+  // the snapshot so there's never a blank state before the first push.
+  const { ref: liveRef, isLive, onVoted } = useLiveSlot(poll.pollId);
+  const liveCounts = useConvexQuery(
+    api.polls.editionCounts,
+    isLive ? { pollId: poll.pollId } : "skip",
+  );
+  const currentEdition = liveCounts
+    ? {
+        ...poll.currentEdition,
+        voteCount: liveCounts.voteCount,
+        optionCounts: liveCounts.optionCounts,
+        // publishedAt is only present once the tally has published — `in` narrows the
+        // optional field so we don't clobber the snapshot's value before the first push.
+        ...("publishedAt" in liveCounts ? { publishedAt: liveCounts.publishedAt } : {}),
+      }
+    : poll.currentEdition;
+  const livePoll = { ...poll, currentEdition };
+
   // Resolve the community this poll belongs to, so the card shows its home community (not the
   // option count). React Query dedupes on ["community", id], so cards from the same community —
   // and the detail page / community header — all share one fetch. LINK polls have no community.
@@ -41,7 +67,7 @@ export function PollCard({
   });
 
   return (
-    <Card className="animate-fade-up p-5 transition hover:border-primary/40 hover:shadow-md">
+    <Card ref={liveRef} className="animate-fade-up p-5 transition hover:border-primary/40 hover:shadow-md">
       <div className="mb-3 flex items-center gap-2 text-xs text-muted-foreground">
         {poll.communityId ? (
           <Link
@@ -70,7 +96,7 @@ export function PollCard({
           </InfoHint>
         )}
         <span className="ml-auto inline-flex items-center gap-2">
-          <VoteCount count={poll.currentEdition.voteCount} />
+          <VoteCount count={livePoll.currentEdition.voteCount} />
           <span aria-hidden className="opacity-50">·</span>
           <span>{relativeTime(poll.createdAt)}</span>
         </span>
@@ -104,9 +130,11 @@ export function PollCard({
         className="mt-3 max-h-72 w-full rounded-lg border"
       />
 
-      {/* Vote inline — clickable options before voting, live result bars after. */}
+      {/* Vote inline — clickable options before voting, live result bars after. When this card
+          holds a live slot, results stream in; voting also pins the card (onVoted) so the voter
+          keeps watching even if it's not one of the top cards. */}
       <div className="mt-4">
-        <VotePanel poll={poll} />
+        <VotePanel poll={livePoll} liveResults={isLive} onVoted={onVoted} />
       </div>
 
       <div className="mt-4 flex items-center gap-4 border-t pt-3 text-xs text-muted-foreground">

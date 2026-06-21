@@ -168,6 +168,34 @@ export const get = query({
   },
 });
 
+/**
+ * GET — current-edition COUNTS ONLY, for live feed cards (DESIGN-010). A trimmed,
+ * cheap sibling of `get`: it applies the same visibility gate (`canViewPoll`) but
+ * skips the creator/community joins and full DTO assembly. Its reactive read-set is
+ * essentially the poll doc + `editionResults`, so it re-pushes (and only then) when
+ * the tally publishes — the read-path subscription the feed cards attach to.
+ * Anonymous-friendly; returns null when not found / not visible (the card then keeps
+ * its snapshot counts).
+ */
+export const editionCounts = query({
+  args: { pollId: v.string(), token: v.optional(v.string()) },
+  handler: async (ctx, { pollId, token }) => {
+    const actor = await optionalActor(ctx);
+    const poll = await getPoll(ctx, pollId);
+    if (!poll || !(await canViewPoll(ctx, poll, actor?.linkId ?? null, token))) return null;
+    const e = await editionView(ctx, poll);
+    return {
+      pollId: poll.pollId,
+      voteCount: e.voteCount,
+      optionCounts: e.optionCounts,
+      ...(e.publishedAt !== undefined ? { publishedAt: e.publishedAt } : {}),
+      status: poll.status,
+      editionLabel: e.label,
+      windowState: e.windowState,
+    };
+  },
+});
+
 /** GET /polls?communityId= | creatorId= — community/creator feeds (anonymous-allowed). */
 export const list = query({
   args: {
