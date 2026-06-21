@@ -126,11 +126,28 @@ export const DEFAULT_SHARE_CARD_SHOW_RESULTS = true;
 
 // ── Tally pipeline (DESIGN-006 §5) ──────────────────────────────────────────
 
-/** Publish interval — the egress throttle: viewers get at most one push per interval. */
-export const TALLY_INTERVAL_SECONDS = 5;
+// ── Tally scheduler (DESIGN-009: self-scheduled dirty-set drain) ────────────
+// Wake-on-vote, not scan-on-timer. A vote marks its ballot dirty and arms ONE drain
+// per shard; the drain folds dirty ballots in K-sized batches and re-arms only while
+// work remains. Job count tracks SHARDS (W), never poll count. Tune later (§4b.2).
 
-/** voteEvents rows folded per tally run; a full page reschedules immediately (catch-up). */
-export const TALLY_PAGE_SIZE = 4096;
+/** W — independent drain lanes. At most one drain queued per shard ⇒ ≤W drains in flight. */
+export const TALLY_SHARDS = 16;
+
+/** K — dirty ballots folded per drainShard pass. Tx budget ≈ K×DRAIN_PAGE event reads. */
+export const DRAIN_BATCH = 20;
+
+/** voteEvents folded per ballot per pass; a full page means backlog remains → catch-up. */
+export const DRAIN_PAGE = 256;
+
+/** Debounce before a queued drain fires — the publish window the optimistic overlay hides. */
+export const DRAIN_DEBOUNCE_MS = 2500;
+
+/** Liveness backstop cadence: the safety sweep re-arms dropped drains this often (§4b.8). */
+export const SAFETY_SWEEP_SECONDS = 30;
+
+/** A drainScheduled shard whose lastArmedAt is older than this is presumed dead → re-armed. */
+export const DRAIN_STALE_MS = 15_000;
 
 /** Flattened demographic dimension keys on voteEvents ("gender#male", "seg:<id>#<answer>"). */
 export const TALLY_DIMENSION = {

@@ -5,16 +5,17 @@ import { Hero } from "@/components/home/Hero";
 import { HomeFeed } from "@/components/home/HomeFeed";
 import { DiscoverFeed } from "@/components/home/DiscoverFeed";
 import { Skeleton } from "@/components/ui/skeleton";
+import { PageContainer } from "@/components/layout/PageContainer";
 
 export default function HomePage() {
   const { user, isLoading } = useSession();
 
   if (isLoading) {
     return (
-      <div className="mx-auto max-w-2xl space-y-4">
+      <PageContainer className="space-y-4">
         <Skeleton className="h-10 w-1/2" />
         <Skeleton className="h-40 w-full rounded-xl" />
-      </div>
+      </PageContainer>
     );
   }
 
@@ -23,15 +24,13 @@ export default function HomePage() {
   return user ? (
     <HomeFeed />
   ) : (
-    <div className="space-y-10">
+    <PageContainer className="space-y-10">
       <Hero compact />
-      <div className="mx-auto max-w-2xl">
-        <DiscoverFeed
-          title="What people are voting on"
-          subtitle="Vote on anything — sign in to make it count."
-          showJoinCta
-        />
-      </div>
-    </div>
+      <DiscoverFeed
+        title="What people are voting on"
+        subtitle="Vote on anything — sign in to make it count."
+        showJoinCta
+      />
+    </PageContainer>
   );
 }

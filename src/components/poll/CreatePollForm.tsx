@@ -8,7 +8,7 @@ import { Plus, X, Link2, Users, BarChart3, EyeOff } from "lucide-react";
 import { createPoll } from "@/lib/polls";
 import { listMySubscriptions, getCommunity } from "@/lib/communities";
 import { routes } from "@/lib/constants";
-import type { AudienceType, BallotMode, CreatePollInput, PollType } from "@/lib/types";
+import type { AudienceType, BallotMode, CreatePollInput, PollType, Recurrence } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -27,6 +27,48 @@ const newOption = (): OptionRow => ({ key: `o${optionSeq++}`, label: "" });
 const MAX_TAGS = 10;
 const MAX_TAG_LEN = 40;
 
+// Recurrence cadences offered at creation. MANUAL (roll-editions-on-demand) is intentionally
+// excluded this phase — it needs a backend "roll" endpoint that doesn't exist yet. The four
+// time-based modes are fully automatic (compute-don't-roll: the edition is a pure function of
+// the clock + timezone), so they need no scheduler.
+const RECURRENCE_OPTIONS: { value: Recurrence; label: string }[] = [
+  { value: "NONE", label: "One-time" },
+  { value: "DAILY", label: "Daily" },
+  { value: "WEEKLY", label: "Weekly" },
+  { value: "MONTHLY", label: "Monthly" },
+  { value: "YEARLY", label: "Yearly" },
+];
+
+// A short curated list of common IANA zones; the viewer's detected zone is prepended (and is
+// the default) so it's always selectable. The backend re-validates the zone string.
+const COMMON_TIMEZONES = [
+  "UTC",
+  "America/Los_Angeles",
+  "America/Denver",
+  "America/Chicago",
+  "America/New_York",
+  "America/Sao_Paulo",
+  "Europe/London",
+  "Europe/Paris",
+  "Europe/Berlin",
+  "Africa/Johannesburg",
+  "Asia/Dubai",
+  "Asia/Kolkata",
+  "Asia/Singapore",
+  "Asia/Shanghai",
+  "Asia/Tokyo",
+  "Australia/Sydney",
+  "Pacific/Auckland",
+];
+
+function detectTimezone(): string {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+  } catch {
+    return "UTC";
+  }
+}
+
 export function CreatePollForm({ initialCommunityId }: { initialCommunityId?: string }) {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -36,6 +78,11 @@ export function CreatePollForm({ initialCommunityId }: { initialCommunityId?: st
   const [question, setQuestion] = useState("");
   const [type, setType] = useState<PollType>("binary");
   const [ballotMode, setBallotMode] = useState<BallotMode>("standard");
+  // Recurrence cadence + the IANA timezone that decides when each edition rolls over. The
+  // timezone select is hidden until a recurring cadence is picked, so seeding it from the
+  // server zone during SSR can't cause a hydration mismatch.
+  const [recurrence, setRecurrence] = useState<Recurrence>("NONE");
+  const [timezone, setTimezone] = useState<string>(detectTimezone);
   // Default poll type is Yes / No, so the options start pre-filled to match.
   const [options, setOptions] = useState<OptionRow[]>([
     { key: "o-yes", label: "Yes" },
@@ -128,6 +175,8 @@ export function CreatePollForm({ initialCommunityId }: { initialCommunityId?: st
     if (!question.trim()) return toast.error("Add a question.");
     if (audience === "COMMUNITY" && !communityId) return toast.error("Pick a community.");
     if (trimmed.length < 2) return toast.error("Add at least two options.");
+    const isRecurring = recurrence !== "NONE";
+    if (isRecurring && !timezone) return toast.error("Pick a timezone for the recurring schedule.");
 
     mutation.mutate({
       audienceType: audience,
@@ -136,6 +185,8 @@ export function CreatePollForm({ initialCommunityId }: { initialCommunityId?: st
       questionMediaId: questionImage?.mediaId,
       type,
       ballotMode,
+      recurrence: isRecurring ? recurrence : undefined,
+      timezone: isRecurring ? timezone : undefined,
       options: options
         .filter((o) => o.label.trim())
         .map((o, i) => ({
@@ -149,6 +200,8 @@ export function CreatePollForm({ initialCommunityId }: { initialCommunityId?: st
   }
 
   const canRemove = type === "multi" && options.length > 2;
+  // Detected/selected zone first, then the common list (deduped).
+  const timezoneOptions = Array.from(new Set([timezone, ...COMMON_TIMEZONES]));
 
   // Progress rail state. Destination + question are required; ballot privacy always has a
   // value (defaults to standard), so it reads as satisfied from the start.
@@ -372,6 +425,49 @@ export function CreatePollForm({ initialCommunityId }: { initialCommunityId?: st
                 hint="Unlinkable votes — no analytics, and votes can’t be changed."
               />
             </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>How often?</CardTitle>
+            <p className="text-sm text-muted-foreground">
+              A recurring poll resets into a fresh edition each period — every edition keeps its
+              own separate results.
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex flex-wrap gap-2">
+              {RECURRENCE_OPTIONS.map((r) => (
+                <TypeChip
+                  key={r.value}
+                  active={recurrence === r.value}
+                  onClick={() => setRecurrence(r.value)}
+                  label={r.label}
+                />
+              ))}
+            </div>
+
+            {recurrence !== "NONE" && (
+              <div className="space-y-1.5">
+                <Label htmlFor="timezone">Timezone</Label>
+                <p className="text-xs text-muted-foreground">
+                  Decides when each {recurrence.toLowerCase()} edition rolls over.
+                </p>
+                <Select
+                  id="timezone"
+                  value={timezone}
+                  onChange={(e) => setTimezone(e.target.value)}
+                  className="max-w-sm"
+                >
+                  {timezoneOptions.map((tz) => (
+                    <option key={tz} value={tz}>
+                      {tz}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+            )}
           </CardContent>
         </Card>
 

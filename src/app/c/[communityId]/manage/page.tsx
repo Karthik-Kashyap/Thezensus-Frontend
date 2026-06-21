@@ -13,6 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ManageModerators } from "@/components/community/ManageModerators";
 import { ManageBans } from "@/components/community/ManageBans";
 import { ManagePins } from "@/components/community/ManagePins";
+import { PageContainer } from "@/components/layout/PageContainer";
 
 /**
  * Community management console (roles / bans / pins). Gated to the community's owner + moderators
@@ -37,18 +38,18 @@ export default function CommunityManagePage() {
 
   if (isLoading || !allowed || !community) {
     return (
-      <div className="mx-auto max-w-2xl space-y-4">
+      <PageContainer className="space-y-4">
         <Skeleton className="h-8 w-48" />
         <Skeleton className="h-10 w-72" />
         <Skeleton className="h-64 w-full" />
-      </div>
+      </PageContainer>
     );
   }
 
   const isOwner = role === "OWNER";
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6">
+    <PageContainer className="space-y-6">
       <div className="space-y-3">
         <Link
           href={routes.community(communityId)}
@@ -81,6 +82,6 @@ export default function CommunityManagePage() {
           <ManagePins communityId={communityId} pinnedPollIds={community.pinnedPollIds ?? []} />
         </TabsContent>
       </Tabs>
-    </div>
+    </PageContainer>
   );
 }

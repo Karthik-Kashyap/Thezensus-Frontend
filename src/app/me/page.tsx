@@ -9,16 +9,17 @@ import { AvatarUploader } from "@/components/profile/AvatarUploader";
 import { SignInGate } from "@/components/auth/SignInGate";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent } from "@/components/ui/card";
+import { PageContainer } from "@/components/layout/PageContainer";
 
 export default function MyProfilePage() {
   const { user, isLoading } = useSession();
 
   if (isLoading) {
     return (
-      <div className="mx-auto max-w-2xl space-y-6">
+      <PageContainer className="space-y-6">
         <Skeleton className="h-24 w-full" />
         <Skeleton className="h-64 w-full" />
-      </div>
+      </PageContainer>
     );
   }
 
@@ -38,7 +39,7 @@ export default function MyProfilePage() {
   ];
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6">
+    <PageContainer className="space-y-6">
       <Card className="overflow-hidden">
         <div className="grain relative h-20 bg-gradient-to-r from-primary/20 via-secondary/15 to-primary/10" />
         <CardContent className="-mt-10 space-y-4">
@@ -65,6 +66,6 @@ export default function MyProfilePage() {
       <ProfileEditor user={user} />
       <ConsentSettings />
       <DangerZone />
-    </div>
+    </PageContainer>
   );
 }

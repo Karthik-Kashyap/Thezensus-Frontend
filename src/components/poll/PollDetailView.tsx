@@ -24,6 +24,7 @@ import { AnalyticsStub } from "./AnalyticsStub";
 import { SlicePanel } from "./SlicePanel";
 import { CommentsSection } from "@/components/comment/CommentsSection";
 import { ReportButton } from "@/components/moderation/ReportDialog";
+import { PageContainer } from "@/components/layout/PageContainer";
 
 export function PollDetailView({ pollId, token }: { pollId: string; token?: string }) {
   const { user } = useSession();
@@ -43,10 +44,10 @@ export function PollDetailView({ pollId, token }: { pollId: string; token?: stri
 
   if (isLoading) {
     return (
-      <div className="mx-auto max-w-2xl space-y-4">
+      <PageContainer className="space-y-4">
         <Skeleton className="h-8 w-2/3" />
         <Skeleton className="h-48 w-full rounded-xl" />
-      </div>
+      </PageContainer>
     );
   }
 
@@ -67,7 +68,7 @@ export function PollDetailView({ pollId, token }: { pollId: string; token?: stri
   const canDelete = isCreator || community?.myRole === "OWNER" || community?.myRole === "MODERATOR";
 
   return (
-    <div className="mx-auto max-w-2xl">
+    <PageContainer>
       <div className="mb-3 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
         {community ? (
           <Link href={routes.community(community.communityId)} className="font-medium text-primary hover:underline">
@@ -155,6 +156,6 @@ export function PollDetailView({ pollId, token }: { pollId: string; token?: stri
       )}
 
       <CommentsSection pollId={poll.pollId} token={token} />
-    </div>
+    </PageContainer>
   );
 }

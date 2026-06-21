@@ -4,6 +4,7 @@ import { useSession } from "@/lib/session";
 import { CreateCommunityForm } from "@/components/community/CreateCommunityForm";
 import { SignInGate } from "@/components/auth/SignInGate";
 import { Skeleton } from "@/components/ui/skeleton";
+import { PageContainer } from "@/components/layout/PageContainer";
 
 export default function NewCommunityPage() {
   const { user, isLoading } = useSession();
@@ -19,7 +20,7 @@ export default function NewCommunityPage() {
   }
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6">
+    <PageContainer size="wide" className="space-y-6">
       <div>
         <h1 className="font-display text-3xl font-semibold tracking-tight">New community</h1>
         <p className="mt-1 text-muted-foreground">
@@ -27,6 +28,6 @@ export default function NewCommunityPage() {
         </p>
       </div>
       <CreateCommunityForm />
-    </div>
+    </PageContainer>
   );
 }

@@ -13,6 +13,7 @@ import { PollCard } from "@/components/poll/PollCard";
 import { DiscoverFeed } from "./DiscoverFeed";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { PageContainer } from "@/components/layout/PageContainer";
 
 /**
  * Logged-in home — two stacked feeds:
@@ -46,7 +47,7 @@ export function HomeFeed() {
   const seen = new Set(myPolls.map((p) => p.pollId));
 
   return (
-    <div className="mx-auto max-w-2xl space-y-10">
+    <PageContainer className="space-y-10">
       <div className="flex items-center justify-between">
         <h1 className="font-display text-3xl font-semibold tracking-tight">Home</h1>
         <Button asChild size="sm">
@@ -69,7 +70,7 @@ export function HomeFeed() {
 
       {/* Discover — global hot-ranked feed; new users get a Join nudge on each card. */}
       <DiscoverFeed excludeIds={seen} showJoinCta={isOnboarding} />
-    </div>
+    </PageContainer>
   );
 }
 

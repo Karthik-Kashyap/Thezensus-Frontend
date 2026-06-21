@@ -19,13 +19,8 @@ import {
   toDims,
   voteSegKey,
 } from "./lib/votes.logic";
-import {
-  getVote,
-  insertVote,
-  changeVoteRow,
-  insertVoteEvent,
-  ensureRegistered,
-} from "./lib/votes.model";
+import { getVote, insertVote, changeVoteRow, insertVoteEvent } from "./lib/votes.model";
+import { noteVote } from "./tally";
 
 /** POST /votes — cast. Guests allowed on LINK polls (token-gated); attributable votes
  *  dedup one-per-edition; anonymous-ballot and guest votes never dedup. */
@@ -59,7 +54,6 @@ export const cast = mutation({
 
     const bKey = ballotKey(poll.pollId, label);
     await ensureEdition(ctx, poll.pollId, label);
-    await ensureRegistered(ctx, bKey, poll.pollId);
 
     // Attributable (dedup-able) only when signed in AND the ballot is standard mode.
     const attributable = actor !== null && poll.ballotMode === BALLOT_MODE.STANDARD;
@@ -93,6 +87,8 @@ export const cast = mutation({
       await insertVoteEvent(ctx, bKey, optionId, 1);
     }
 
+    // Register (if new) + mark the ballot dirty + arm its drain — the wake-on-vote trigger.
+    await noteVote(ctx, bKey, poll.pollId);
     return { status: "accepted", pollId: poll.pollId, edition: label, optionId };
   },
 });
@@ -133,6 +129,8 @@ export const change = mutation({
     await insertVoteEvent(ctx, bKey, existing.optionId, -1, dims, segKey);
     await insertVoteEvent(ctx, bKey, optionId, 1, dims, segKey);
 
+    // The −old/+new deltas need folding too — wake the tally for this ballot.
+    await noteVote(ctx, bKey, poll.pollId);
     return { status: "changed", pollId: poll.pollId, edition: label, optionId };
   },
 });

@@ -356,16 +356,36 @@ export default defineSchema({
   }).index("by_ballot", ["ballotKey"]),
 
   /**
-   * Which ballots the tally tick scans. Inserted once by the FIRST vote on an edition
-   * (insert-only — later votes read it but it's never rewritten, so no OCC contention
-   * with the vote path), removed by the tally when the edition is no longer current and
-   * the backlog is drained.
+   * The tally's dirty set (DESIGN-009). One row per ballotKey, inserted by the first vote
+   * on an edition; later votes read it but only the clean→dirty edge rewrites it (so the
+   * vote path stays contention-free). A vote sets `dirtySince`; the drain folds the dirty
+   * ballots of its shard and clears the flag — removing the row when the edition is no
+   * longer current and fully drained. Both `shard` and `dirtySince` are always present —
+   * set on every insert (vote path + seed).
    */
   tallyRegistry: defineTable({
     ballotKey: v.string(),
     pollId: v.string(),
-    pendingUntil: v.optional(v.number()), // reserved for the wake-on-vote scheduler (DESIGN-008, deferred) — no logic this turn
-  }).index("by_ballot", ["ballotKey"]),
+    shard: v.number(), // = shardFor(ballotKey); assigned once at registration
+    dirtySince: v.number(), // 0 = clean (folded & current); >0 = ms ts of the first vote since the last drain
+  })
+    .index("by_ballot", ["ballotKey"]) // vote-path point read + clear
+    // The drain claims one shard's dirty ballots oldest-first (FIFO): clean rows sit at
+    // dirtySince=0, so `eq(shard).gt(dirtySince, 0)` reads EXACTLY the dirty slice — never
+    // a whole-table scan. Every row lives in this index for life.
+    .index("by_shard_dirty", ["shard", "dirtySince"]),
+
+  /**
+   * One row per shard (W rows total). Coalesces drain SCHEDULING so at most one drain is
+   * ever queued per shard. Touched only on the clean→dirty edge (arm) and by the drain's
+   * rearm/disarm — never per vote. `lastArmedAt` is the drain chain's proof-of-life for the
+   * safety sweep (a stale flag ⇒ the drain action died ⇒ re-arm). DESIGN-009 §4b.1.
+   */
+  tallyControl: defineTable({
+    shard: v.number(),
+    drainScheduled: v.boolean(), // true while a drain is queued/running for this shard
+    lastArmedAt: v.optional(v.number()),
+  }).index("by_shard", ["shard"]),
 
   // ── Comments (Phase 3) ────────────────────────────────────────────────────
 

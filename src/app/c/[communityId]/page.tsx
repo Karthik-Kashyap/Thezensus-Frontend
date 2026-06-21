@@ -8,6 +8,7 @@ import { listCommunityPolls } from "@/lib/polls";
 import { CommunityHeader } from "@/components/community/CommunityHeader";
 import { PollFeed } from "@/components/poll/PollFeed";
 import { Skeleton } from "@/components/ui/skeleton";
+import { PageContainer } from "@/components/layout/PageContainer";
 
 export default function CommunityPage() {
   const { communityId } = useParams<{ communityId: string }>();
@@ -19,10 +20,10 @@ export default function CommunityPage() {
 
   if (isLoading) {
     return (
-      <div className="mx-auto max-w-2xl space-y-6">
+      <PageContainer className="space-y-6">
         <Skeleton className="h-48 w-full rounded-xl" />
         <Skeleton className="h-40 w-full rounded-xl" />
-      </div>
+      </PageContainer>
     );
   }
 
@@ -46,7 +47,7 @@ export default function CommunityPage() {
   }
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6">
+    <PageContainer className="space-y-6">
       <CommunityHeader community={community} />
       <PollFeed
         queryKey={["communityPolls", communityId]}
@@ -54,6 +55,6 @@ export default function CommunityPage() {
         emptyTitle="No polls yet"
         emptyMessage="Start the conversation — create the first poll here."
       />
-    </div>
+    </PageContainer>
   );
 }

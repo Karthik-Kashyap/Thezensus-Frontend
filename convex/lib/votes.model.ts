@@ -11,6 +11,7 @@
 
 import type { QueryCtx, MutationCtx } from "../_generated/server";
 import type { Doc } from "../_generated/dataModel";
+import { shardFor } from "./tally.logic";
 
 type Ctx = QueryCtx | MutationCtx;
 
@@ -112,8 +113,10 @@ export async function getRegistryEntry(
 }
 
 /**
- * Called by the FIRST vote on an edition (insert-only; existing rows are read but never
- * rewritten, so votes can't OCC-contend on it). Registers the ballot for tally scans.
+ * Register a ballot in a CLEAN state (`dirtySince = 0`). Used by the seed path, which
+ * publishes editionResults directly — there's no backlog to fold, so the row starts clean.
+ * The live vote path does NOT use this; it registers-dirty-and-arms via `noteVote`
+ * (tally.ts). Insert-only: existing rows are read but never rewritten here.
  */
 export async function ensureRegistered(
   ctx: MutationCtx,
@@ -121,9 +124,48 @@ export async function ensureRegistered(
   pollId: string,
 ): Promise<void> {
   const existing = await getRegistryEntry(ctx, ballotKey);
-  if (!existing) await ctx.db.insert("tallyRegistry", { ballotKey, pollId });
+  if (!existing) {
+    await ctx.db.insert("tallyRegistry", { ballotKey, pollId, shard: shardFor(ballotKey), dirtySince: 0 });
+  }
 }
 
-export async function listRegistry(ctx: Ctx): Promise<Doc<"tallyRegistry">[]> {
-  return await ctx.db.query("tallyRegistry").collect();
+// ── Tally scheduler: dirty-set + shard control (DESIGN-009) ──────────────────
+
+/** A shard's coalescing control row (the "is a drain queued?" flag). */
+export async function getControl(ctx: Ctx, shard: number): Promise<Doc<"tallyControl"> | null> {
+  return await ctx.db
+    .query("tallyControl")
+    .withIndex("by_shard", (q) => q.eq("shard", shard))
+    .unique();
+}
+
+/**
+ * The oldest-dirtied ballotKeys of one shard, FIFO (dirtySince ascending). Reads EXACTLY
+ * the dirty slice via `eq(shard).gt(dirtySince, 0)` — never the whole registry.
+ */
+export async function claimDirtyBallots(ctx: Ctx, shard: number, limit: number): Promise<string[]> {
+  const rows = await ctx.db
+    .query("tallyRegistry")
+    .withIndex("by_shard_dirty", (q) => q.eq("shard", shard).gt("dirtySince", 0))
+    .order("asc")
+    .take(limit);
+  return rows.map((r) => r.ballotKey);
+}
+
+/** Whether a shard has any dirty ballot (existence probe for rearm/sweep). */
+export async function hasDirtyBallot(ctx: Ctx, shard: number): Promise<boolean> {
+  const first = await ctx.db
+    .query("tallyRegistry")
+    .withIndex("by_shard_dirty", (q) => q.eq("shard", shard).gt("dirtySince", 0))
+    .first();
+  return first !== null;
+}
+
+/** The newest event on a ballot — the single-row tail read that closes the snapshot→publish gap. */
+export async function latestVoteEvent(ctx: Ctx, ballotKey: string): Promise<Doc<"voteEvents"> | null> {
+  return await ctx.db
+    .query("voteEvents")
+    .withIndex("by_ballot", (q) => q.eq("ballotKey", ballotKey))
+    .order("desc")
+    .first();
 }

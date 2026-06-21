@@ -109,7 +109,7 @@ export const create = mutation({
       type: input.type,
       options: media.options,
       ballotMode: input.ballotMode ?? DEFAULT_BALLOT_MODE,
-      requireLoginToVote: input.requireLoginToVote ?? false,
+      requireLoginToVote: input.requireLoginToVote ?? true,
       recurrence,
       timezone: input.timezone,
       recurrenceStart: input.recurrenceStart,

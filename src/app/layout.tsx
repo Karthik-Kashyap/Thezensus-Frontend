@@ -33,8 +33,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <Providers>
           <div className="bg-mesh">
             <Nav />
-            <div className="mx-auto flex w-full max-w-[1240px] gap-0">
+            <div className="mx-auto flex w-full max-w-[1600px] gap-0">
               <Sidebar />
+              {/* Width is set per page via <PageContainer> (single source of truth in that file),
+                  so pages can pick "standard" or "wide" — main just fills the center column. */}
               <main className="min-w-0 flex-1 px-4 py-8 sm:px-8">
                 <AccountGate>{children}</AccountGate>
               </main>

@@ -12,6 +12,7 @@ import { PollFeed } from "@/components/poll/PollFeed";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ComingSoon } from "@/components/common/ComingSoon";
+import { PageContainer } from "@/components/layout/PageContainer";
 
 export function ProfileView({ profile }: { profile: PublicProfile }) {
   const { user } = useSession();
@@ -23,7 +24,7 @@ export function ProfileView({ profile }: { profile: PublicProfile }) {
       : null;
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6">
+    <PageContainer className="space-y-6">
       <Card className="overflow-hidden">
         <div className="grain relative h-20 bg-gradient-to-r from-primary/20 via-secondary/15 to-primary/10" />
         <CardContent className="-mt-10 space-y-4">
@@ -78,7 +79,7 @@ export function ProfileView({ profile }: { profile: PublicProfile }) {
           />
         </TabsContent>
       </Tabs>
-    </div>
+    </PageContainer>
   );
 }
 
