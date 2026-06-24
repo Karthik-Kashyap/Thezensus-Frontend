@@ -20,6 +20,7 @@ import {
   voteSegKey,
 } from "./lib/votes.logic";
 import { getVote, insertVote, changeVoteRow, insertVoteEvent } from "./lib/votes.model";
+import { bumpUserStats } from "./lib/users.model";
 import { noteVote } from "./tally";
 
 /** POST /votes — cast. Guests allowed on LINK polls (token-gated); attributable votes
@@ -74,6 +75,9 @@ export const cast = mutation({
         ...(snapshot ? { demographics: snapshot } : {}),
       });
       await insertVoteEvent(ctx, bKey, optionId, 1, toDims(snapshot), segKey);
+      // Own-doc counter (DESIGN-011): the voter's own userStats, attributable votes only.
+      // Guest/anonymous votes carry no linkId, so they never count toward votesCast.
+      await bumpUserStats(ctx, actor!.linkId, { votesCast: 1 });
     } else {
       // Guest or anonymous-ballot vote: fresh random voter id, never dedups, no
       // identity, no demographics (unlinkable by construction).
@@ -88,7 +92,7 @@ export const cast = mutation({
     }
 
     // Register (if new) + mark the ballot dirty + arm its drain — the wake-on-vote trigger.
-    await noteVote(ctx, bKey, poll.pollId);
+    await noteVote(ctx, bKey, poll.pollId, poll.creatorId);
     return { status: "accepted", pollId: poll.pollId, edition: label, optionId };
   },
 });
@@ -129,8 +133,10 @@ export const change = mutation({
     await insertVoteEvent(ctx, bKey, existing.optionId, -1, dims, segKey);
     await insertVoteEvent(ctx, bKey, optionId, 1, dims, segKey);
 
-    // The −old/+new deltas need folding too — wake the tally for this ballot.
-    await noteVote(ctx, bKey, poll.pollId);
+    // The −old/+new deltas need folding too — wake the tally for this ballot. No votesCast
+    // bump: a move isn't a new cast, and the edition's totalVotes (creator roll-up) is
+    // unchanged, so the drain's delta is naturally 0.
+    await noteVote(ctx, bKey, poll.pollId, poll.creatorId);
     return { status: "changed", pollId: poll.pollId, edition: label, optionId };
   },
 });

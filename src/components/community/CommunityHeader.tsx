@@ -63,11 +63,21 @@ export function CommunityHeader({ community }: { community: Community }) {
           <Badge variant="outline" className="gap-1">
             <vis.icon className="h-3 w-3" /> {vis.label}
           </Badge>
+          {community.category && <Badge variant="primary">{community.category}</Badge>}
         </div>
         {community.description && (
           <p className="mt-2 max-w-2xl text-[15px] leading-relaxed text-muted-foreground">
             {community.description}
           </p>
+        )}
+        {community.tags && community.tags.length > 0 && (
+          <div className="mt-3 flex flex-wrap gap-1.5">
+            {community.tags.map((t) => (
+              <Badge key={t} variant="default">
+                #{t}
+              </Badge>
+            ))}
+          </div>
         )}
         <div className="mt-3 flex items-center gap-1.5 text-sm text-muted-foreground">
           <Users className="h-4 w-4" />

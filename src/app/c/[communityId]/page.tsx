@@ -7,6 +7,7 @@ import { getCommunity } from "@/lib/communities";
 import { listCommunityPolls } from "@/lib/polls";
 import { CommunityHeader } from "@/components/community/CommunityHeader";
 import { PollFeed } from "@/components/poll/PollFeed";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PageContainer } from "@/components/layout/PageContainer";
 
@@ -49,6 +50,18 @@ export default function CommunityPage() {
   return (
     <PageContainer className="space-y-6">
       <CommunityHeader community={community} />
+      {community.rules && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Community rules</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">
+              {community.rules}
+            </p>
+          </CardContent>
+        </Card>
+      )}
       <PollFeed
         queryKey={["communityPolls", communityId]}
         fetchPage={(cursor) => listCommunityPolls(communityId, { cursor })}

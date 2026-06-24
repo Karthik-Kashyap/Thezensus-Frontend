@@ -23,7 +23,7 @@ export const getPoll = async (id: string, token?: string): Promise<Poll> => {
 
 export const updatePoll = (
   id: string,
-  input: Partial<{ question: string; visibility: string; requireLoginToVote: boolean; status: "ACTIVE" | "CLOSED"; tags: string[]; category: string }>,
+  input: Partial<{ question: string; visibility: string; requireLoginToVote: boolean; status: "ACTIVE" | "CLOSED"; tags: string[]; category: string; shareCardShowResults: boolean }>,
 ) =>
   withApiError(
     convex.mutation(api.polls.update, {

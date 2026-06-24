@@ -1,12 +1,17 @@
 "use client";
 
 import { useState } from "react";
+import { useQuery as useConvexQuery } from "convex/react";
 import { Check, Copy, ExternalLink, Share2 } from "lucide-react";
 import { toast } from "sonner";
+import { api } from "../../../convex/_generated/api";
+import type { EditionList, Recurrence } from "@/lib/types";
 import { routes } from "@/lib/constants";
+import { formatEditionLabel } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select } from "@/components/ui/select";
 import {
   Dialog,
   DialogContent,
@@ -26,12 +31,15 @@ import {
 export function ShareButton({
   pollId,
   token,
+  recurrence = "NONE",
   canShareImage = false,
   optionCount = 0,
   imageShowsResults = false,
 }: {
   pollId: string;
   token?: string;
+  /** The poll's cadence — gates the "share a specific edition" picker (recurring polls only). */
+  recurrence?: Recurrence;
   canShareImage?: boolean;
   optionCount?: number;
   imageShowsResults?: boolean;
@@ -39,9 +47,24 @@ export function ShareButton({
   const [copied, setCopied] = useState(false);
   // Default to 8 options, or all of them if the poll has fewer (matches "show all when < 8").
   const [countDraft, setCountDraft] = useState(() => String(Math.min(8, Math.max(1, optionCount || 8))));
+  // "" = share the current/live edition (the default). A past label = share that edition.
+  const [editionDraft, setEditionDraft] = useState("");
+
+  // Recurring polls only: the edition list for the picker (current always present). "skip" keeps
+  // one-off polls from issuing a needless query.
+  const editions = useConvexQuery(
+    api.polls.listEditions,
+    recurrence !== "NONE" ? { pollId, token } : "skip",
+  ) as EditionList | null | undefined;
+  const hasHistory = !!editions && editions.labels.length > 1;
+  // Only carry the param when an actual past edition is chosen — keeps current-edition links clean.
+  const shareEdition = editions && editionDraft && editionDraft !== editions.current ? editionDraft : null;
 
   const origin = typeof window !== "undefined" ? window.location.origin : "";
-  const link = `${origin}${routes.poll(pollId, token)}`;
+  // routes.poll may already carry ?token= (LINK polls); append edition with the right separator.
+  const pollPath = routes.poll(pollId, token);
+  const sep = pollPath.includes("?") ? "&" : "?";
+  const link = `${origin}${pollPath}${shareEdition ? `${sep}edition=${encodeURIComponent(shareEdition)}` : ""}`;
 
   // The numeric count actually used for the image: clamped to [1, optionCount]. Invalid/empty
   // input falls back to the default rather than breaking the URL.
@@ -52,7 +75,9 @@ export function ShareButton({
     return Math.max(1, Math.min(n, optionCount || n));
   }
   const count = clampCount(countDraft);
-  const imageUrl = `${origin}/poll/${encodeURIComponent(pollId)}/card?count=${count}`;
+  const imageUrl =
+    `${origin}/poll/${encodeURIComponent(pollId)}/card?count=${count}` +
+    (shareEdition ? `&edition=${encodeURIComponent(shareEdition)}` : "");
 
   async function copyLink() {
     try {
@@ -80,6 +105,28 @@ export function ShareButton({
             {canShareImage ? "Copy the link, or download the share image." : "Copy the link to share this poll."}
           </DialogDescription>
         </DialogHeader>
+
+        {/* Recurring polls: pick which edition to share (link + image follow the choice). */}
+        {hasHistory && editions && (
+          <div className="flex items-center justify-between gap-3">
+            <Label htmlFor="share-edition" className="text-sm font-normal text-muted-foreground">
+              Edition
+            </Label>
+            <Select
+              id="share-edition"
+              value={editionDraft || editions.current}
+              onChange={(e) => setEditionDraft(e.target.value)}
+              className="h-9 max-w-[16rem]"
+            >
+              {editions.labels.map((label) => (
+                <option key={label} value={label}>
+                  {formatEditionLabel(recurrence, label)}
+                  {label === editions.current ? " (current)" : ""}
+                </option>
+              ))}
+            </Select>
+          </div>
+        )}
 
         {/* Default: the link. */}
         <div className="flex items-center gap-2">

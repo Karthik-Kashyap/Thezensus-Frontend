@@ -1,5 +1,7 @@
 // Small presentation helpers shared across components.
 
+import type { Recurrence } from "./types";
+
 /** Up-to-two-letter initials from a display name, for avatar fallbacks. */
 export function initials(name?: string | null): string {
   if (!name) return "?";
@@ -34,6 +36,54 @@ export function shortDate(iso?: string): string | null {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return null;
   return d.toLocaleDateString(undefined, { dateStyle: "medium" });
+}
+
+/**
+ * A remaining-time span → compact countdown that ticks to the second, e.g.
+ * "2d 3h 4m", "4h 36m 12s", "36m 12s", "12s". Seconds are dropped only at the
+ * day scale (pointless precision); clamps to "now" at/under zero.
+ */
+export function formatCountdown(ms: number): string {
+  if (ms <= 0) return "now";
+  const totalSec = Math.floor(ms / 1000);
+  const days = Math.floor(totalSec / 86_400);
+  const hours = Math.floor((totalSec % 86_400) / 3600);
+  const mins = Math.floor((totalSec % 3600) / 60);
+  const secs = totalSec % 60;
+  if (days > 0) return `${days}d ${hours}h ${mins}m`;
+  if (hours > 0) return `${hours}h ${mins}m ${secs}s`;
+  if (mins > 0) return `${mins}m ${secs}s`;
+  return `${secs}s`;
+}
+
+/**
+ * A raw edition label → a friendly, cadence-aware name for the history picker:
+ *   DAILY   "2026-06-22" → "Jun 22, 2026"
+ *   WEEKLY  "2026-W25"   → "Week 25, 2026"
+ *   MONTHLY "2026-06"    → "June 2026"
+ *   YEARLY  "2026"       → "2026"
+ *   NONE/MANUAL "main"   → "Current"
+ * Falls back to the raw label if it doesn't match the expected shape.
+ */
+export function formatEditionLabel(recurrence: Recurrence, label: string): string {
+  if (recurrence === "DAILY") {
+    const d = new Date(`${label}T00:00:00`);
+    return Number.isNaN(d.getTime()) ? label : d.toLocaleDateString(undefined, { dateStyle: "medium" });
+  }
+  if (recurrence === "WEEKLY") {
+    const m = /^(\d{4})-W(\d{2})$/.exec(label);
+    return m ? `Week ${Number(m[2])}, ${m[1]}` : label;
+  }
+  if (recurrence === "MONTHLY") {
+    const m = /^(\d{4})-(\d{2})$/.exec(label);
+    if (!m) return label;
+    return new Date(Number(m[1]), Number(m[2]) - 1, 1).toLocaleDateString(undefined, {
+      month: "long",
+      year: "numeric",
+    });
+  }
+  if (recurrence === "YEARLY") return label;
+  return label === "main" ? "Current" : label;
 }
 
 /** Vote count → "1.2k" style compaction. */

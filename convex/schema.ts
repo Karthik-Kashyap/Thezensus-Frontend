@@ -366,6 +366,11 @@ export default defineSchema({
   tallyRegistry: defineTable({
     ballotKey: v.string(),
     pollId: v.string(),
+    // The poll's creator, denormalized here so the drain can roll votes into the creator's
+    // `userStats.totalVotesReceived` (DESIGN-011) without a per-publish poll read. Immutable
+    // (a poll never changes creator), so the copy can't go stale. Set on every insert
+    // (vote path + seed); backfilled onto pre-existing rows before this was made required.
+    creatorId: v.string(),
     shard: v.number(), // = shardFor(ballotKey); assigned once at registration
     dirtySince: v.number(), // 0 = clean (folded & current); >0 = ms ts of the first vote since the last drain
   })

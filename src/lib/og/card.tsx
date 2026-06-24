@@ -1,8 +1,9 @@
-// Shared renderer for the poll share-card image (next/og / Satori). Two endpoints use it:
-//   • opengraph-image.tsx — the social unfurl: fixed 1200×630, option list capped (+N more),
-//     because chat/social cards expect that aspect ratio.
-//   • poll/[pollId]/card/route.tsx — the in-app downloadable image: height grows with the
-//     chosen option count (cardImageHeight) so the user can render every option.
+// Shared renderer for the poll share-card image (next/og / Satori). The poll/[pollId]/card route
+// uses it two ways:
+//   • ?og=1 — the social unfurl (og:image / twitter:image, wired in the page's generateMetadata):
+//     fixed 1200×630, option list capped (+N more), because chat/social cards expect that ratio.
+//   • ?count=N — the in-app downloadable image: height grows with the chosen option count
+//     (cardImageHeight) so the user can render every option.
 //
 // Satori constraints: flexbox only; any box with >1 child must set display:flex; a text node
 // must be a single child (so percentages/counts are pre-joined into one string); colors are

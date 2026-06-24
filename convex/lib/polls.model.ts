@@ -41,6 +41,16 @@ export async function ensureEdition(
   return (await ctx.db.get(id))!;
 }
 
+/** Every edition that ever opened for a poll (created lazily on first vote), newest-first —
+ *  the source for the history picker. The (pollId, label) index sorts labels chronologically,
+ *  so `desc` is newest-first for every cadence. */
+export function editionsByPoll(ctx: Ctx, pollId: string) {
+  return ctx.db
+    .query("editions")
+    .withIndex("by_poll_label", (q) => q.eq("pollId", pollId))
+    .order("desc");
+}
+
 /** Newest-first pages for the community / creator feeds (callers filter visibility). */
 export function pollsByCommunity(ctx: Ctx, communityId: string) {
   return ctx.db

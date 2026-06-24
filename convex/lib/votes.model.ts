@@ -122,10 +122,17 @@ export async function ensureRegistered(
   ctx: MutationCtx,
   ballotKey: string,
   pollId: string,
+  creatorId: string,
 ): Promise<void> {
   const existing = await getRegistryEntry(ctx, ballotKey);
   if (!existing) {
-    await ctx.db.insert("tallyRegistry", { ballotKey, pollId, shard: shardFor(ballotKey), dirtySince: 0 });
+    await ctx.db.insert("tallyRegistry", {
+      ballotKey,
+      pollId,
+      creatorId, // denormalized for the drain's totalVotesReceived roll-up (DESIGN-011)
+      shard: shardFor(ballotKey),
+      dirtySince: 0,
+    });
   }
 }
 

@@ -1,6 +1,6 @@
 import { ConvexHttpClient } from "convex/browser";
 import { api } from "../../../convex/_generated/api";
-import type { Poll } from "@/lib/types";
+import type { Poll, EditionScoreboard } from "@/lib/types";
 
 // A request/response Convex client for SERVER rendering only (generateMetadata + the OG image
 // route). Deliberately UNAUTHENTICATED and token-less: it calls polls.get with no actor and no
@@ -12,11 +12,22 @@ import type { Poll } from "@/lib/types";
 const url = process.env.NEXT_PUBLIC_CONVEX_URL;
 const client = url ? new ConvexHttpClient(url) : null;
 
-/** Fetch a poll for share-card rendering, or null if it isn't publicly viewable / doesn't exist. */
-export async function fetchPublicPoll(pollId: string): Promise<Poll | null> {
+/**
+ * Fetch a poll for share-card rendering, or null if it isn't publicly viewable / doesn't exist.
+ * Pass `edition` to render a specific past edition's results instead of the live one — its
+ * scoreboard is spliced into `currentEdition` (the card renderer reads only that). An unknown /
+ * non-public edition falls back to the live edition rather than failing.
+ */
+export async function fetchPublicPoll(pollId: string, edition?: string): Promise<Poll | null> {
   if (!client) return null;
   try {
-    return (await client.query(api.polls.get, { pollId })) as Poll | null;
+    const poll = (await client.query(api.polls.get, { pollId })) as Poll | null;
+    if (!poll || !edition || edition === poll.currentEdition.label) return poll;
+    const scoreboard = (await client.query(api.polls.edition, {
+      pollId,
+      label: edition,
+    })) as EditionScoreboard | null;
+    return scoreboard ? { ...poll, currentEdition: scoreboard } : poll;
   } catch {
     return null;
   }

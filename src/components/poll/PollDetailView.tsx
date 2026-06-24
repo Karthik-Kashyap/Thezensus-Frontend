@@ -15,18 +15,29 @@ import { Badge } from "@/components/ui/badge";
 import { InfoHint } from "@/components/common/InfoHint";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { VotePanel } from "./VotePanel";
+import { PollBallot } from "./PollBallot";
 import { PollImage } from "./PollImage";
 import { ShareButton } from "./ShareButton";
 import { DeletePollButton } from "./DeletePollButton";
+import { EditPollButton } from "./EditPollButton";
 import { VoteCount } from "./VoteCount";
+import { NextEditionCountdown } from "./NextEditionCountdown";
 import { AnalyticsStub } from "./AnalyticsStub";
 import { SlicePanel } from "./SlicePanel";
 import { CommentsSection } from "@/components/comment/CommentsSection";
 import { ReportButton } from "@/components/moderation/ReportDialog";
 import { PageContainer } from "@/components/layout/PageContainer";
 
-export function PollDetailView({ pollId, token }: { pollId: string; token?: string }) {
+export function PollDetailView({
+  pollId,
+  token,
+  edition,
+}: {
+  pollId: string;
+  token?: string;
+  /** Optional deep-link target edition (from a shared `?edition=` link). */
+  edition?: string;
+}) {
   const { user } = useSession();
 
   // LIVE subscription (the 5s re-poll is gone): Convex pushes a new snapshot whenever
@@ -63,9 +74,10 @@ export function PollDetailView({ pollId, token }: { pollId: string; token?: stri
   }
 
   const isCreator = user?.linkId === poll.creatorId;
-  // Creator or a community owner/mod may delete (mirrors canEditPoll on the backend, which the
-  // remove mutation re-checks). myRole is present on the community DTO only for owners/mods.
-  const canDelete = isCreator || community?.myRole === "OWNER" || community?.myRole === "MODERATOR";
+  // Creator or a community owner/mod may edit/close/delete (mirrors canEditPoll on the backend,
+  // which the update/remove mutations re-check). myRole is present on the community DTO only for
+  // owners/mods.
+  const canManage = isCreator || community?.myRole === "OWNER" || community?.myRole === "MODERATOR";
 
   return (
     <PageContainer>
@@ -92,6 +104,9 @@ export function PollDetailView({ pollId, token }: { pollId: string; token?: stri
             </Badge>
           </InfoHint>
         )}
+        {poll.status !== "CLOSED" && poll.currentEdition.nextEditionAt !== undefined && (
+          <NextEditionCountdown at={poll.currentEdition.nextEditionAt} />
+        )}
         {poll.status === "CLOSED" && <Badge variant="outline">Closed</Badge>}
         {poll.ballotMode === "anonymous" && (
           <InfoHint content={ANONYMOUS_HINT}>
@@ -103,11 +118,12 @@ export function PollDetailView({ pollId, token }: { pollId: string; token?: stri
         <div className="ml-auto flex items-center gap-2">
           {/* Shareable = anything publicly viewable: every LINK poll, and any community poll
               that isn't private (a private poll's link only resolves for members). The link
-              unfurls with the generated OG card (opengraph-image.tsx). */}
+              unfurls with the generated OG card (page generateMetadata → /card?og=1). */}
           {!(poll.audienceType === "COMMUNITY" && poll.visibility === "private") && (
             <ShareButton
               pollId={poll.pollId}
               token={poll.audienceType === "LINK" ? poll.shareToken ?? token : undefined}
+              recurrence={poll.recurrence}
               canShareImage={poll.audienceType === "COMMUNITY" && poll.visibility !== "private"}
               optionCount={poll.options.length}
               imageShowsResults={poll.shareCardShowResults !== false && poll.currentEdition.voteCount > 0}
@@ -122,7 +138,8 @@ export function PollDetailView({ pollId, token }: { pollId: string; token?: stri
               variant="inline"
             />
           )}
-          {canDelete && <DeletePollButton pollId={poll.pollId} communityId={poll.communityId} />}
+          {canManage && <EditPollButton poll={poll} />}
+          {canManage && <DeletePollButton pollId={poll.pollId} communityId={poll.communityId} />}
         </div>
       </div>
 
@@ -139,7 +156,7 @@ export function PollDetailView({ pollId, token }: { pollId: string; token?: stri
             alt={poll.question}
             className="max-h-96 w-full rounded-xl border"
           />
-          <VotePanel poll={poll} token={token} liveResults />
+          <PollBallot poll={poll} token={token} initialEdition={edition} />
         </CardContent>
       </Card>
 

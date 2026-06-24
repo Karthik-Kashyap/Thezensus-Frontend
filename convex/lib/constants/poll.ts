@@ -116,6 +116,11 @@ export const TRENDING_TAGS_MAX = 8;
 /** Feed comment counts are capped at one index page; render as "N+" beyond this. */
 export const COMMENT_COUNT_CAP = 100;
 
+/** Edition-history picker: the most-recent editions listed for a recurring poll. A long-running
+ *  daily poll accrues one row per day; the picker shows this many newest (older ones are pruned
+ *  from the list, not the data — deep history would page later if ever needed). */
+export const EDITION_HISTORY_MAX = 60;
+
 export const DEFAULT_AUDIENCE = POLL_AUDIENCE.COMMUNITY;
 export const DEFAULT_VISIBILITY = POLL_VISIBILITY.PUBLIC;
 export const DEFAULT_BALLOT_MODE = BALLOT_MODE.STANDARD;

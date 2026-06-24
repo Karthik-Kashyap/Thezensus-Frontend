@@ -55,6 +55,31 @@ export async function getUserAggregate(ctx: Ctx, linkId: string): Promise<UserAg
   return { profile, stats, demographics, settings, moderation };
 }
 
+// ── Stats counters (DESIGN-011) ─────────────────────────────────────────────
+
+/**
+ * Add signed deltas to a user's profile counters (the canonical helper for all three).
+ * Read-modify-write of the user's OWN `userStats` doc:
+ *   • `pollsCreated`   — bumped by polls.ts create (own doc, low-rate).
+ *   • `votesCast`      — bumped by votes.ts cast for attributable votes (voter's own doc).
+ *   • `totalVotesReceived` — bumped by the tally drain (tally.ts publishBallot) by the
+ *     per-publish delta, NEVER on the vote path (that single creator doc would be the
+ *     write hotspot the tally exists to avoid). No-op if the doc is absent (deleted user).
+ */
+export async function bumpUserStats(
+  ctx: MutationCtx,
+  linkId: string,
+  delta: { pollsCreated?: number; votesCast?: number; totalVotesReceived?: number },
+): Promise<void> {
+  const doc = await byLinkId(ctx, "userStats", linkId);
+  if (!doc) return;
+  await ctx.db.patch(doc._id, {
+    pollsCreated: doc.pollsCreated + (delta.pollsCreated ?? 0),
+    votesCast: doc.votesCast + (delta.votesCast ?? 0),
+    totalVotesReceived: doc.totalVotesReceived + (delta.totalVotesReceived ?? 0),
+  });
+}
+
 // ── Writes (patch only the fields provided; undefined = leave unchanged) ─────
 
 export interface ProfilePatch {

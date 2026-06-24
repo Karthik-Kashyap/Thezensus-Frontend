@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { X } from "lucide-react";
 import { createCommunity, subscribe } from "@/lib/communities";
 import { SEGMENT_LIMITS, routes } from "@/lib/constants";
 import type { CreateCommunityInput, SegmentDef, Visibility } from "@/lib/types";
@@ -15,6 +16,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Stepper, type Step } from "@/components/ui/stepper";
 import { SegmentEditor } from "./SegmentEditor";
 import { VisibilityField } from "./VisibilityField";
+
+// Mirror COMMUNITY_LIMITS in community-service — the create mutation re-validates.
+const TAGS_MAX = 10;
+const TAG_MAX = 40;
+const CATEGORY_MAX = 40;
+const RULES_MAX = 4000;
 
 /** Trim a draft question and drop empty options. Used to decide which questions to keep + validate. */
 function cleanQuestion(q: SegmentDef): SegmentDef {
@@ -31,6 +38,10 @@ export function CreateCommunityForm() {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [visibility, setVisibility] = useState<Visibility>("public");
+  const [category, setCategory] = useState("");
+  const [tags, setTags] = useState<string[]>([]);
+  const [tagDraft, setTagDraft] = useState("");
+  const [rules, setRules] = useState("");
   const [segments, setSegments] = useState<SegmentDef[]>([]);
 
   const mutation = useMutation({
@@ -54,6 +65,23 @@ export function CreateCommunityForm() {
     onError: () => toast.error("Could not create the community."),
   });
 
+  // Topics — bare lowercase tokens (the "#nba" model), deduped, capped. Mirrors the poll forms.
+  function addTag(raw: string) {
+    const t = raw.trim().replace(/^#+/, "").toLowerCase().slice(0, TAG_MAX);
+    if (!t) return;
+    setTags((prev) => (prev.includes(t) || prev.length >= TAGS_MAX ? prev : [...prev, t]));
+    setTagDraft("");
+  }
+
+  function onTagKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === "Enter" || e.key === ",") {
+      e.preventDefault();
+      addTag(tagDraft);
+    } else if (e.key === "Backspace" && !tagDraft && tags.length) {
+      setTags((prev) => prev.slice(0, -1));
+    }
+  }
+
   function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!name.trim()) return;
@@ -73,6 +101,9 @@ export function CreateCommunityForm() {
       name: name.trim(),
       description: description.trim() || undefined,
       visibility,
+      category: category.trim() || undefined,
+      tags: tags.length ? tags : undefined,
+      rules: rules.trim() || undefined,
       segments: cleaned.length ? cleaned : undefined,
     });
   }
@@ -133,6 +164,56 @@ export function CreateCommunityForm() {
                 onChange={(e) => setDescription(e.target.value)}
               />
             </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="category">
+                Category <span className="font-normal text-muted-foreground">(optional)</span>
+              </Label>
+              <Input
+                id="category"
+                placeholder="e.g. Technology, Sports, Education"
+                maxLength={CATEGORY_MAX}
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="tags">
+                Topics <span className="font-normal text-muted-foreground">(optional)</span>
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                Add up to {TAGS_MAX} so people can find this community. Press Enter or comma.
+              </p>
+              <div className="flex flex-wrap items-center gap-2 rounded-lg border bg-background p-2 focus-within:border-primary/60">
+                {tags.map((t) => (
+                  <span
+                    key={t}
+                    className="inline-flex items-center gap-1 rounded-full bg-accent px-2.5 py-0.5 text-sm font-medium"
+                  >
+                    #{t}
+                    <button
+                      type="button"
+                      onClick={() => setTags((prev) => prev.filter((x) => x !== t))}
+                      className="text-muted-foreground hover:text-foreground"
+                      aria-label={`Remove ${t}`}
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </span>
+                ))}
+                {tags.length < TAGS_MAX && (
+                  <input
+                    id="tags"
+                    value={tagDraft}
+                    maxLength={TAG_MAX}
+                    onChange={(e) => setTagDraft(e.target.value)}
+                    onKeyDown={onTagKeyDown}
+                    onBlur={() => addTag(tagDraft)}
+                    placeholder={tags.length ? "Add another…" : "e.g. gaming, seattle, ai"}
+                    className="min-w-[8rem] flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+                  />
+                )}
+              </div>
+            </div>
           </CardContent>
         </Card>
 
@@ -142,6 +223,25 @@ export function CreateCommunityForm() {
           </CardHeader>
           <CardContent>
             <VisibilityField value={visibility} onChange={setVisibility} />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Community rules</CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Optional. Guidelines shown to members — what’s welcome here and what isn’t.
+            </p>
+          </CardHeader>
+          <CardContent>
+            <Textarea
+              id="rules"
+              placeholder="e.g. Be respectful. No spam or self-promotion. Stay on topic."
+              maxLength={RULES_MAX}
+              rows={5}
+              value={rules}
+              onChange={(e) => setRules(e.target.value)}
+            />
           </CardContent>
         </Card>
 

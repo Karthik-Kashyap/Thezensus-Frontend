@@ -19,6 +19,7 @@ import { SubscribeButton } from "@/components/community/SubscribeButton";
 import { VotePanel } from "./VotePanel";
 import { PollImage } from "./PollImage";
 import { VoteCount } from "./VoteCount";
+import { NextEditionCountdown } from "./NextEditionCountdown";
 
 /**
  * A poll in a feed — votable in place: the options are clickable and casting shows live results
@@ -86,6 +87,9 @@ export function PollCard({
               <Repeat className="h-3 w-3" /> {poll.recurrence.toLowerCase()}
             </span>
           </InfoHint>
+        )}
+        {poll.status !== "CLOSED" && livePoll.currentEdition.nextEditionAt !== undefined && (
+          <NextEditionCountdown at={livePoll.currentEdition.nextEditionAt} />
         )}
         {poll.status === "CLOSED" && <Badge variant="outline">Closed</Badge>}
         {poll.ballotMode === "anonymous" && (

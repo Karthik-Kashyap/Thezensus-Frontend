@@ -16,6 +16,7 @@ import {
   DEFAULT_BALLOT_MODE,
   DEFAULT_RECURRENCE,
   FEED_PAGE,
+  POLL_LIMITS,
 } from "./lib/constants/poll";
 import { isTimeBased } from "./lib/editions.logic";
 import {
@@ -28,6 +29,8 @@ import {
   canEditPoll,
   isHidden,
   editionView,
+  editionByLabel,
+  listEditionLabels,
   freezeSegmentSchema,
   toPollDetail,
   toFeedItem,
@@ -37,6 +40,7 @@ import {
   initialEditionLabel,
 } from "./lib/polls.logic";
 import { getPoll, pollsByCommunity, pollsByCreator } from "./lib/polls.model";
+import { bumpUserStats } from "./lib/users.model";
 import {
   getCommunity,
   isMember,
@@ -148,6 +152,10 @@ export const create = mutation({
       await ctx.db.insert("polls", { ...base, shareToken: newShareToken() });
     }
 
+    // Own-doc lifetime counter (DESIGN-011). Lifetime rule: `remove` never decrements —
+    // a soft-deleted poll still counts as "created".
+    await bumpUserStats(ctx, actor.linkId, { pollsCreated: 1 });
+
     const poll = (await getPoll(ctx, base.pollId))!;
     return await toPollDetail(ctx, poll, await editionView(ctx, poll), actor.linkId);
   },
@@ -193,6 +201,38 @@ export const editionCounts = query({
       editionLabel: e.label,
       windowState: e.windowState,
     };
+  },
+});
+
+/**
+ * GET — the labels of a poll's editions (newest-first) for the history picker. The `current`
+ * label is always present, even when its edition has no votes (hence no row) yet, so the
+ * default selection always resolves. Anonymous-friendly; null when not found / not visible.
+ */
+export const listEditions = query({
+  args: { pollId: v.string(), token: v.optional(v.string()) },
+  handler: async (ctx, { pollId, token }) => {
+    const actor = await optionalActor(ctx);
+    const poll = await getPoll(ctx, pollId);
+    if (!poll || !(await canViewPoll(ctx, poll, actor?.linkId ?? null, token))) return null;
+    return await listEditionLabels(ctx, poll);
+  },
+});
+
+/**
+ * GET — one edition's scoreboard by label, for viewing a PAST edition's results read-only.
+ * Past editions are immutable (their `editionResults` never change again), so this is
+ * effectively static; passing the current label re-runs live like `editionCounts`.
+ * Anonymous-friendly; null when not found / not visible / the label is malformed.
+ */
+export const edition = query({
+  args: { pollId: v.string(), label: v.string(), token: v.optional(v.string()) },
+  handler: async (ctx, { pollId, label, token }) => {
+    if (label.length === 0 || label.length > POLL_LIMITS.editionLabelMax) return null;
+    const actor = await optionalActor(ctx);
+    const poll = await getPoll(ctx, pollId);
+    if (!poll || !(await canViewPoll(ctx, poll, actor?.linkId ?? null, token))) return null;
+    return await editionByLabel(ctx, poll, label);
   },
 });
 

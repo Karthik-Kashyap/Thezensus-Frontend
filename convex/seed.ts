@@ -12,9 +12,8 @@
 
 import { v } from "convex/values";
 import { mutation } from "./_generated/server";
-import type { MutationCtx } from "./_generated/server";
 import { completeSignup } from "./lib/signup.logic";
-import { updateDemographics } from "./lib/users.model";
+import { updateDemographics, bumpUserStats } from "./lib/users.model";
 import { newPollId, newCommunityId, newCommentId, newShareToken, newGuestVoter } from "./lib/ids";
 import {
   ballotKey,
@@ -43,23 +42,6 @@ function assertSeedEnabled(): void {
       "Seeding is disabled. Run `npx convex env set ALLOW_SEED true` on a DEV deployment to enable it (never on prod).",
     );
   }
-}
-
-async function bumpStats(
-  ctx: MutationCtx,
-  linkId: string,
-  delta: { pollsCreated?: number; votesCast?: number; totalVotesReceived?: number },
-): Promise<void> {
-  const doc = await ctx.db
-    .query("userStats")
-    .withIndex("by_linkId", (q) => q.eq("linkId", linkId))
-    .unique();
-  if (!doc) return;
-  await ctx.db.patch(doc._id, {
-    pollsCreated: doc.pollsCreated + (delta.pollsCreated ?? 0),
-    votesCast: doc.votesCast + (delta.votesCast ?? 0),
-    totalVotesReceived: doc.totalVotesReceived + (delta.totalVotesReceived ?? 0),
-  });
 }
 
 // ── Users ─────────────────────────────────────────────────────────────────────
@@ -290,7 +272,7 @@ export const seedPoll = mutation({
     for (const vote of input.votes) {
       if (!poll.options.some((o) => o.id === vote.optionId)) continue;
       if (!registered) {
-        await ensureRegistered(ctx, bKey, pollId);
+        await ensureRegistered(ctx, bKey, pollId, input.creatorLinkId);
         registered = true;
       }
       const attributable = vote.voterLinkId !== undefined && ballotMode === BALLOT_MODE.STANDARD;
@@ -313,7 +295,7 @@ export const seedPoll = mutation({
           ...(snapshot ? { demographics: snapshot } : {}),
         });
         await insertVoteEvent(ctx, bKey, vote.optionId, 1, dims);
-        await bumpStats(ctx, vote.voterLinkId!, { votesCast: 1 });
+        await bumpUserStats(ctx, vote.voterLinkId!, { votesCast: 1 });
       } else {
         await insertVote(ctx, {
           ballotKey: bKey,
@@ -353,7 +335,7 @@ export const seedPoll = mutation({
       });
     }
 
-    await bumpStats(ctx, input.creatorLinkId, { pollsCreated: 1, totalVotesReceived: total });
+    await bumpUserStats(ctx, input.creatorLinkId, { pollsCreated: 1, totalVotesReceived: total });
     return { pollId, votes: total, comments: (input.comments ?? []).length };
   },
 });

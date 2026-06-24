@@ -111,3 +111,94 @@ export function currentEditionLabel(poll: {
   if (!isTimeBased(poll.recurrence)) return poll.currentEdition ?? MAIN_EDITION;
   return computeEditionLabel(poll.recurrence, poll.timezone);
 }
+
+// ── Next-edition boundary (the "next poll in …" countdown target) ────────────
+
+/** Calendar arithmetic on a UTC anchor — once y/m/d is fixed the date math is
+ *  timezone-free (same trick isoWeekLabel uses); the zone re-enters only at midnight. */
+function addCalendarDays(
+  year: number,
+  month: number,
+  day: number,
+  days: number,
+): { year: number; month: number; day: number } {
+  const dt = new Date(Date.UTC(year, month - 1, day));
+  dt.setUTCDate(dt.getUTCDate() + days);
+  return { year: dt.getUTCFullYear(), month: dt.getUTCMonth() + 1, day: dt.getUTCDate() };
+}
+
+/** Days from y/m/d to the next ISO Monday (1–7; never 0 — a fresh week always starts ahead). */
+function daysToNextMonday(year: number, month: number, day: number): number {
+  const dt = new Date(Date.UTC(year, month - 1, day));
+  const isoDow = dt.getUTCDay() === 0 ? 7 : dt.getUTCDay();
+  return 8 - isoDow;
+}
+
+/** UTC offset (ms) of `zone` at `instant`: the zone's wall-clock minus the same fields read as UTC. */
+function zoneOffsetMs(zone: string, instant: Date): number {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: zone,
+    hourCycle: "h23",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  }).formatToParts(instant);
+  const get = (t: string) => Number(parts.find((p) => p.type === t)!.value);
+  const asUtc = Date.UTC(
+    get("year"),
+    get("month") - 1,
+    get("day"),
+    get("hour") % 24, // neutralize any "24" midnight rendering
+    get("minute"),
+    get("second"),
+  );
+  return asUtc - instant.getTime();
+}
+
+/**
+ * The UTC instant (ms) of local midnight on y/m/d in `zone`. Two-pass to settle DST: the
+ * first pass guesses with the wall-clock-as-UTC offset, the second corrects if the zone's
+ * offset differs at that candidate instant (a spring-forward / fall-back boundary).
+ */
+function zonedMidnightMs(year: number, month: number, day: number, zone: string): number {
+  const wall = Date.UTC(year, month - 1, day, 0, 0, 0);
+  const guess = wall - zoneOffsetMs(zone, new Date(wall));
+  return wall - zoneOffsetMs(zone, new Date(guess));
+}
+
+/**
+ * The instant (epoch ms) the *next* edition opens — the exclusive end of the current
+ * edition's window — for a time-based recurrence in the poll's timezone. This is the exact
+ * moment computeEditionLabel() rolls to the next label, i.e. what a "next poll in …"
+ * countdown ticks down to. Returns undefined for NONE/MANUAL (no clock-driven rollover).
+ */
+export function nextEditionStart(
+  recurrence: Recurrence,
+  timezone: string | undefined,
+  at: Date = new Date(),
+): number | undefined {
+  if (!isTimeBased(recurrence)) return undefined;
+  const zone = timezone ?? "UTC";
+  const { year, month, day } = zonedYmd(at, zone);
+  let next: { year: number; month: number; day: number };
+  switch (recurrence) {
+    case RECURRENCE.DAILY:
+      next = addCalendarDays(year, month, day, 1);
+      break;
+    case RECURRENCE.WEEKLY:
+      next = addCalendarDays(year, month, day, daysToNextMonday(year, month, day));
+      break;
+    case RECURRENCE.MONTHLY:
+      next = month === 12 ? { year: year + 1, month: 1, day: 1 } : { year, month: month + 1, day: 1 };
+      break;
+    case RECURRENCE.YEARLY:
+      next = { year: year + 1, month: 1, day: 1 };
+      break;
+    default:
+      return undefined;
+  }
+  return zonedMidnightMs(next.year, next.month, next.day, zone);
+}

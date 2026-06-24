@@ -14,17 +14,25 @@ import {
   BINARY_OPTION_COUNT,
   EDITION_STATUS,
   COMMENT_COUNT_CAP,
+  EDITION_HISTORY_MAX,
   HOME_CANDIDATE_PER_COMMUNITY,
   DISCOVER_CANDIDATE_SCAN,
   TRENDING_TAGS_MAX,
   ballotKey,
   type PollVisibility,
 } from "./constants/poll";
-import { currentEditionLabel, windowState, isTimeBased, type WindowState } from "./editions.logic";
+import {
+  currentEditionLabel,
+  windowState,
+  isTimeBased,
+  computeEditionLabel,
+  nextEditionStart,
+  type WindowState,
+} from "./editions.logic";
 import { badRequest } from "./errors";
 import { isMember, isOwnerOrMod } from "./communities.model";
 import { getProfile } from "./users.model";
-import { getEdition, pollsByCommunity, pollsDiscoverable } from "./polls.model";
+import { getEdition, editionsByPoll, pollsByCommunity, pollsDiscoverable } from "./polls.model";
 import { getResults, getVote } from "./votes.model";
 import { getMedia } from "./media.model";
 import { MEDIA_KIND, MEDIA_STATUS } from "./constants/media";
@@ -198,29 +206,87 @@ export interface EditionView {
   /** Tally publish stamp — lets the client expire optimistic overlays exactly when
    *  the published counts include its own vote. Absent until the first publish. */
   publishedAt?: number;
+  /** Epoch-ms instant the next edition opens (the "next poll in …" countdown target).
+   *  Present only for time-based recurrences whose current edition is live and whose next
+   *  period still falls within the recurrence window; absent for NONE/MANUAL and the final
+   *  edition. Stable within an edition, so it never churns the reactive query. */
+  nextEditionAt?: number;
 }
 
 /**
- * The current edition's live scoreboard: label from the clock (compute-don't-roll),
- * counts from `editionResults` (the tally's published doc — so any query returning this
- * re-runs at most once per publish interval), zeros synthesized when no votes yet.
+ * When a recurring poll's current edition is live, the instant its *next* edition opens —
+ * so the UI can render a "next poll in …" countdown. Only for time-based cadences with the
+ * current edition ACTIVE, and suppressed once the next period would land past recurrenceEnd
+ * (no further edition exists to count down to).
  */
-export async function editionView(ctx: Ctx, poll: Doc<"polls">): Promise<EditionView> {
-  const label = currentEditionLabel(poll);
+function nextEditionField(poll: Doc<"polls">, state: WindowState): { nextEditionAt?: number } {
+  if (state !== "ACTIVE") return {};
+  const at = nextEditionStart(poll.recurrence, poll.timezone);
+  if (at === undefined) return {};
+  const nextLabel = computeEditionLabel(poll.recurrence, poll.timezone, new Date(at));
+  if (windowState(nextLabel, poll.recurrenceStart, poll.recurrenceEnd) === "ENDED") return {};
+  return { nextEditionAt: at };
+}
+
+/**
+ * A specific edition's scoreboard by label: counts from `editionResults` (the tally's
+ * published doc — so any query returning this re-runs at most once per publish interval),
+ * zeros synthesized when no votes yet, window state derived from the label. `isCurrent` gates
+ * the `nextEditionAt` countdown (only the live edition counts down to a successor). Backs both
+ * the live current-edition view and the read-only history viewer (DESIGN — past editions).
+ */
+export async function editionViewFor(
+  ctx: Ctx,
+  poll: Doc<"polls">,
+  label: string,
+  isCurrent: boolean,
+): Promise<EditionView> {
   const [edition, results] = await Promise.all([
     getEdition(ctx, poll.pollId, label),
     getResults(ctx, ballotKey(poll.pollId, label)),
   ]);
   const optionCounts: Record<string, number> = {};
   for (const o of poll.options) optionCounts[o.id] = results?.counts[o.id] ?? 0;
+  const state = windowState(label, poll.recurrenceStart, poll.recurrenceEnd);
   return {
     label,
-    windowState: windowState(label, poll.recurrenceStart, poll.recurrenceEnd),
+    windowState: state,
     status: edition?.status ?? EDITION_STATUS.OPEN,
     voteCount: results?.totalVotes ?? 0,
     optionCounts,
     ...(results ? { publishedAt: results.publishedAt } : {}),
+    ...(isCurrent ? nextEditionField(poll, state) : {}),
   };
+}
+
+/** The current edition's live scoreboard (compute-don't-roll label + the next-edition countdown). */
+export async function editionView(ctx: Ctx, poll: Doc<"polls">): Promise<EditionView> {
+  return editionViewFor(ctx, poll, currentEditionLabel(poll), true);
+}
+
+/** One edition by label, resolving whether it's the live (current) one — for the history viewer. */
+export async function editionByLabel(
+  ctx: Ctx,
+  poll: Doc<"polls">,
+  label: string,
+): Promise<EditionView> {
+  return editionViewFor(ctx, poll, label, label === currentEditionLabel(poll));
+}
+
+/**
+ * A recurring poll's edition labels for the history picker, newest-first: the most recent
+ * EDITION_HISTORY_MAX that ever opened (rows are created lazily on first vote), with the current
+ * computed edition guaranteed at the front even if nobody has voted in it yet (so the default
+ * selection always exists). Labels sort chronologically, so the index `desc` is already newest-first.
+ */
+export async function listEditionLabels(
+  ctx: Ctx,
+  poll: Doc<"polls">,
+): Promise<{ current: string; labels: string[] }> {
+  const current = currentEditionLabel(poll);
+  const rows = await editionsByPoll(ctx, poll.pollId).take(EDITION_HISTORY_MAX);
+  const labels = rows.map((r) => r.label);
+  return { current, labels: labels.includes(current) ? labels : [current, ...labels] };
 }
 
 // ── DTO mapping (shapes mirror src/lib/types.ts) ────────────────────────────

@@ -30,6 +30,7 @@ import {
 } from "./lib/constants/poll";
 import { currentEditionLabel } from "./lib/editions.logic";
 import { getPoll } from "./lib/polls.model";
+import { bumpUserStats } from "./lib/users.model";
 import { shardFor, foldEvents, type TallySums } from "./lib/tally.logic";
 import {
   getTallyState,
@@ -51,14 +52,20 @@ import {
  * is clean only for the first vote of each ~debounce window), so steady-state votes add
  * just one already-done point read; no shared-doc write per vote (C1).
  */
-export async function noteVote(ctx: MutationCtx, ballot: string, pollId: string): Promise<void> {
+export async function noteVote(
+  ctx: MutationCtx,
+  ballot: string,
+  pollId: string,
+  creatorId: string,
+): Promise<void> {
   const reg = await getRegistryEntry(ctx, ballot);
   const now = Date.now();
 
   if (!reg) {
-    // First vote on this edition: register dirty + arm.
+    // First vote on this edition: register dirty + arm. Stamp the poll's creator so the
+    // drain can roll this edition's votes into their totalVotesReceived (DESIGN-011).
     const shard = shardFor(ballot);
-    await ctx.db.insert("tallyRegistry", { ballotKey: ballot, pollId, shard, dirtySince: now });
+    await ctx.db.insert("tallyRegistry", { ballotKey: ballot, pollId, creatorId, shard, dirtySince: now });
     await arm(ctx, shard);
     return;
   }
@@ -169,6 +176,9 @@ export const publishBallot = internalMutation({
     hadEvents: v.boolean(),
   },
   handler: async (ctx, a): Promise<boolean> => {
+    // Read once; reused for the creator roll-up (below) and retirement (bottom).
+    const reg = await getRegistryEntry(ctx, a.ballotKey);
+
     if (a.hadEvents) {
       const state = await getTallyState(ctx, a.ballotKey);
       const stateDoc = {
@@ -193,6 +203,19 @@ export const publishBallot = internalMutation({
       };
       if (published) await ctx.db.patch(published._id, resultsDoc);
       else await ctx.db.insert("editionResults", resultsDoc);
+
+      // Roll this edition's NEW votes into the creator's lifetime total (DESIGN-011).
+      // delta = new published total − prior published total = exactly the votes folded
+      // this pass. Computed against the just-read prior, so a duplicate/retried drain
+      // re-reads the already-updated total → delta 0 → no double-count (idempotent, like
+      // the SET above). The write is the tally's, off the vote path; OCC conflicts between
+      // two of a creator's ballots draining at once retry and converge. Skipped when the
+      // registry row predates the creatorId backfill (transition only — backfillUserStats
+      // re-derives the truth regardless).
+      const delta = a.totalVotes - (published?.totalVotes ?? 0);
+      if (delta !== 0 && reg?.creatorId) {
+        await bumpUserStats(ctx, reg.creatorId, { totalVotesReceived: delta });
+      }
     }
 
     if (a.pageFull) return false; // backlog remains → stay dirty, drain catches up
@@ -210,7 +233,6 @@ export const publishBallot = internalMutation({
 
     // Fully caught up. Clear dirty, OR retire the row if the edition is no longer current
     // (the old tick's retirement logic, moved here). editionResults stays forever.
-    const reg = await getRegistryEntry(ctx, a.ballotKey);
     if (reg) {
       const poll = await getPoll(ctx, reg.pollId);
       const isCurrent =

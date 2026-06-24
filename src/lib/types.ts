@@ -192,6 +192,16 @@ export interface EditionScoreboard {
   optionCounts: Record<string, number>;
   /** Tally publish stamp (Convex); used to expire optimistic vote overlays. */
   publishedAt?: number;
+  /** Epoch-ms instant the next edition opens — drives the "next poll in …" countdown on
+   *  recurring polls. Absent for one-off (NONE) / MANUAL polls and the final edition. */
+  nextEditionAt?: number;
+}
+
+/** A recurring poll's edition labels for the history picker (api.polls.listEditions): the
+ *  most-recent editions newest-first, with `current` the live one (always present in `labels`). */
+export interface EditionList {
+  current: string;
+  labels: string[];
 }
 
 export interface Poll {
