@@ -1,5 +1,5 @@
 // Mints the short-lived RS256 JWT the Convex client authenticates with (DESIGN-006 §6.3).
-// Claims contract (convex/auth.config.ts): iss = AUTH_JWT_ISSUER, aud = "thezensus",
+// Claims contract (convex/auth.config.ts): iss = AUTH_JWT_ISSUER, aud = "pollzens",
 // sub = linkId (ADR-006 — the pseudonym, never the userId), header kid matching the JWKS
 // on the Convex deployment. Short TTL: the client re-fetches from /api/auth/convex-token
 // (cookie-gated), so a stolen token ages out fast while the session cookie stays the

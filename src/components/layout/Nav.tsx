@@ -21,10 +21,10 @@ export function Nav() {
         <MobileSidebar />
         <Link href={routes.home} className="group flex items-center gap-2">
           <span className="grid h-8 w-8 place-items-center rounded-lg bg-primary text-primary-foreground shadow-sm transition group-hover:rotate-[-6deg]">
-            <span className="font-display text-lg font-semibold leading-none">T</span>
+            <span className="font-display text-lg font-semibold leading-none">P</span>
           </span>
           <span className="font-display text-xl font-semibold tracking-tight">
-            Thezensus
+            Pollzens
           </span>
         </Link>
 

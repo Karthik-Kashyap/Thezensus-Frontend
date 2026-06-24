@@ -5,7 +5,7 @@
 
 export const OG_SIZE = { width: 1200, height: 630 } as const;
 export const OG_CONTENT_TYPE = "image/png";
-export const OG_ALT = "A poll on Thezensus";
+export const OG_ALT = "A poll on Pollzens";
 
 /** Literal mirrors of the :root design tokens (globals.css). Satori can't read CSS vars. */
 export const OG = {

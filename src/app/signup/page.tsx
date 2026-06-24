@@ -3,7 +3,7 @@ import { cookies } from "next/headers";
 import { SignupForm } from "@/components/auth/SignupForm";
 import { COOKIE, readSignupPending } from "@/lib/server/session";
 
-export const metadata: Metadata = { title: "Finish signing up — Thezensus" };
+export const metadata: Metadata = { title: "Finish signing up — Pollzens" };
 
 // First-time Google sign-in lands here (the OAuth callback redirects new identities to /signup with
 // a short-lived signup-pending cookie). The form completes the account via /auth/signup/complete.

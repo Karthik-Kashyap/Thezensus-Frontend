@@ -37,7 +37,7 @@ export function LoginDialog({
       <DialogTrigger asChild>{trigger}</DialogTrigger>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Welcome to Thezensus</DialogTitle>
+          <DialogTitle>Welcome to Pollzens</DialogTitle>
           <DialogDescription>Sign in to create polls, vote, and comment.</DialogDescription>
         </DialogHeader>
 

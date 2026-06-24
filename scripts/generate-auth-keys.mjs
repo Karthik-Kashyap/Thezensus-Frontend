@@ -17,7 +17,7 @@ const jwksDataUri = `data:text/plain;charset=utf-8;base64,${Buffer.from(jwks).to
 
 const sessionSecret = randomBytes(32).toString("base64url");
 const bridgeSecret = randomBytes(32).toString("base64url");
-const issuer = "https://thezensus.com";
+const issuer = "https://pollzens.com";
 
 console.log("─".repeat(72));
 console.log("1) Append to frontend/.env.local  (KEEP PRIVATE — never commit)");

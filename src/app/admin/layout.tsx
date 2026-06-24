@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { AdminGate } from "@/components/admin/AdminGate";
 
 export const metadata: Metadata = {
-  title: "Moderation — Thezensus",
+  title: "Moderation — Pollzens",
   robots: { index: false, follow: false },
 };
 

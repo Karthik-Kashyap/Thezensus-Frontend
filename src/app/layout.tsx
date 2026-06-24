@@ -22,7 +22,7 @@ const sans = Plus_Jakarta_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "Thezensus — Settle anything. Ask everyone.",
+  title: "Pollzens — Settle anything. Ask everyone.",
   description: "Create a poll on anything. Vote on everything. The world's opinion, counted.",
 };
 

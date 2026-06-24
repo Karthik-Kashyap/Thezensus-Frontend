@@ -33,7 +33,7 @@ function Wordmark() {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
       <div style={{ width: 30, height: 30, borderRadius: 9, background: OG.primary }} />
-      <div style={{ fontSize: 30, fontWeight: 700, color: OG.fg, letterSpacing: -0.5 }}>Thezensus</div>
+      <div style={{ fontSize: 30, fontWeight: 700, color: OG.fg, letterSpacing: -0.5 }}>Pollzens</div>
     </div>
   );
 }
@@ -153,7 +153,7 @@ export function pollCardElement(poll: Poll, maxOptions: number): ReactElement {
       eyebrow={eyebrow}
       footer={
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%" }}>
-          <div style={{ display: "flex" }}>thezensus.com</div>
+          <div style={{ display: "flex" }}>pollzens.com</div>
           <div style={{ display: "flex", fontWeight: 600, color: OG.fg }}>
             {votes > 0 ? `${votes.toLocaleString()} vote${votes === 1 ? "" : "s"}` : "Be the first to vote"}
           </div>
@@ -171,11 +171,11 @@ export function pollCardElement(poll: Poll, maxOptions: number): ReactElement {
 /** The generic card for private / link / not-found polls (no content leak). */
 export function genericCardElement(): ReactElement {
   return (
-    <Frame eyebrow="Poll" footer={<div style={{ display: "flex" }}>thezensus.com</div>}>
+    <Frame eyebrow="Poll" footer={<div style={{ display: "flex" }}>pollzens.com</div>}>
       <div style={{ display: "flex", fontSize: 68, fontWeight: 700, color: OG.fg, lineHeight: 1.1, letterSpacing: -1 }}>
         {OG_TAGLINE}
       </div>
-      <div style={{ display: "flex", fontSize: 34, color: OG.muted }}>Vote on a poll on Thezensus.</div>
+      <div style={{ display: "flex", fontSize: 34, color: OG.muted }}>Vote on a poll on Pollzens.</div>
     </Frame>
   );
 }

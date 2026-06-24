@@ -25,7 +25,7 @@ import { cn } from "@/lib/utils";
  */
 export function DiscoverFeed({
   title = "Discover",
-  subtitle = "Public polls from across Thezensus.",
+  subtitle = "Public polls from across Pollzens.",
   excludeIds,
   showJoinCta = false,
 }: {

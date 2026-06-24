@@ -51,7 +51,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   if (outcome.status === "underage") {
     // COPPA (ADR-008): reject, create nothing, store nothing. Clear the pending token too.
     const res = NextResponse.json(
-      { message: "You must be at least 13 years old to use Thezensus." },
+      { message: "You must be at least 13 years old to use Pollzens." },
       { status: 403 },
     );
     clearCookie(res, COOKIE.SIGNUP_PENDING);

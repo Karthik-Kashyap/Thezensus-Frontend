@@ -4,7 +4,7 @@
 //
 // Both values are Convex deployment environment variables (set via `npx convex env set`):
 //   AUTH_JWT_ISSUER — must EXACTLY match the JWT `iss` claim. A constant identifier, not
-//                     a fetched URL (e.g. https://thezensus.com) — works the same on
+//                     a fetched URL (e.g. https://pollzens.com) — works the same on
 //                     localhost and prod.
 //   AUTH_JWKS       — the public key set as a data URI
 //                     (data:text/plain;charset=utf-8;base64,<base64 of the JWKS JSON>),
@@ -16,7 +16,7 @@ export default {
   providers: [
     {
       type: "customJwt",
-      applicationID: "thezensus", // must match the JWT `aud` claim
+      applicationID: "pollzens", // must match the JWT `aud` claim
       issuer: process.env.AUTH_JWT_ISSUER,
       jwks: process.env.AUTH_JWKS,
       algorithm: "RS256",

@@ -1,6 +1,6 @@
-# Thezensus — Frontend (Next.js 16, App Router)
+# Pollzens — Frontend (Next.js 16, App Router)
 
-The web client for Thezensus. Talks to the backend **gateway** under `/api/*` with a cookie
+The web client for Pollzens. Talks to the backend **gateway** under `/api/*` with a cookie
 session (Google OAuth). Built with Tailwind + a small set of
 shadcn-style primitives (copied into `src/components/ui`), `next-themes` (light/dark), and
 React Query for server state.

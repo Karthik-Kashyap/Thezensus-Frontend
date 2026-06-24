@@ -60,7 +60,7 @@ export function SignupForm({
     mutationFn: (input: CompleteSignupInput) => completeSignup(input),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["me"] });
-      toast.success("Welcome to Thezensus!");
+      toast.success("Welcome to Pollzens!");
       router.push(returnTo ?? "/me");
     },
     onError: (e) => {
@@ -87,7 +87,7 @@ export function SignupForm({
       <Rejected
         icon={<CalendarClock className="h-6 w-6" />}
         title="You need to be 13 or older"
-        body="Thanks for your interest. Thezensus isn’t available to people under 13, so we couldn’t
+        body="Thanks for your interest. Pollzens isn’t available to people under 13, so we couldn’t
               create your account. Nothing was saved."
       />
     );

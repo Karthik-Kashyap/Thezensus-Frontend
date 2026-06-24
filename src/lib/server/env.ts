@@ -35,7 +35,7 @@ export const convexAuthKid = () => required("CONVEX_AUTH_KID");
 
 /** JWT issuer — a constant identifier that must EXACTLY match the Convex deployment's
  *  AUTH_JWT_ISSUER env var. Not fetched by anyone (the JWKS travels as a data URI). */
-export const jwtIssuer = () => process.env.AUTH_JWT_ISSUER ?? "https://thezensus.com";
+export const jwtIssuer = () => process.env.AUTH_JWT_ISSUER ?? "https://pollzens.com";
 
 /** JWT audience — must match `applicationID` in convex/auth.config.ts. */
-export const JWT_AUDIENCE = "thezensus";
+export const JWT_AUDIENCE = "pollzens";

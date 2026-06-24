@@ -3,7 +3,7 @@
 @tailwind utilities;
 
 /*
- * Thezensus design tokens.
+ * Pollzens design tokens.
  * Neutral slate base + indigo primary + coral secondary accent.
  * "Approachable enterprise": calm and trustworthy for orgs, lively for social.
  * Colors are HSL channel triplets so Tailwind can apply opacity (hsl(var(--x) / <alpha>)).

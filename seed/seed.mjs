@@ -1,4 +1,4 @@
-// Thezensus dev seeder. Reads the JSON in ./data, expands it into personas + communities
+// Pollzens dev seeder. Reads the JSON in ./data, expands it into personas + communities
 // + polls + votes + comments, and loads it into the DEV Convex deployment by calling the
 // dev-only mutations in convex/seed.ts.
 //
@@ -80,7 +80,7 @@ async function main() {
     const handle = displayName.replace(/[^a-z0-9]/gi, "").toLowerCase() || "user";
     return {
       subject: `seed-${runId}-${i}`,
-      email: `${handle}.${runId}@seed.thezensus.test`,
+      email: `${handle}.${runId}@seed.pollzens.test`,
       displayName,
       birthDate: `${birthYear}-06-15`,
       ...(Math.random() > usersCfg.noBioFraction ? { bio: pick(usersCfg.bios) } : {}),

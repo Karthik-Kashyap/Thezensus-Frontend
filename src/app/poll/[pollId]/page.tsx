@@ -43,14 +43,14 @@ export async function generateMetadata({
 
   // Private / LINK / missing → generic, non-leaking metadata (the OG image renders generic too).
   if (!poll) {
-    return { title: "Poll · Thezensus", description: "Vote on a poll on Thezensus." };
+    return { title: "Poll · Pollzens", description: "Vote on a poll on Pollzens." };
   }
 
   const votes = poll.currentEdition.voteCount;
   const reveal = poll.shareCardShowResults !== false && votes > 0;
   const description = reveal
-    ? `${votes.toLocaleString()} vote${votes === 1 ? "" : "s"} so far — cast yours on Thezensus.`
-    : "Cast your vote on Thezensus.";
+    ? `${votes.toLocaleString()} vote${votes === 1 ? "" : "s"} so far — cast yours on Pollzens.`
+    : "Cast your vote on Pollzens.";
 
   // OG/Twitter image is the /card route in fixed social size (og=1), carrying the same edition —
   // built as an absolute URL since there's no metadataBase. Config-based (not file-based
@@ -62,7 +62,7 @@ export async function generateMetadata({
   const images = [{ url: imageUrl, width: OG_SIZE.width, height: OG_SIZE.height, alt: OG_ALT }];
 
   return {
-    title: `${poll.question} · Thezensus`,
+    title: `${poll.question} · Pollzens`,
     description,
     openGraph: { title: poll.question, description, type: "website", images },
     twitter: { card: "summary_large_image", title: poll.question, description, images },

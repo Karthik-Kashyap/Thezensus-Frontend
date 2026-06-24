@@ -1,4 +1,4 @@
-// The full Thezensus schema — every DynamoDB table translated per DESIGN-006 §4.
+// The full Pollzens schema — every DynamoDB table translated per DESIGN-006 §4.
 // DDB item-collection tricks (SK discriminators, mirror items) are normalized into
 // real tables; mirrors are replaced by two-way indexes. Entity ids stay app-generated
 // prefixed ULIDs (lib/ids.ts) so URLs are independent of storage — with ONE deliberate
