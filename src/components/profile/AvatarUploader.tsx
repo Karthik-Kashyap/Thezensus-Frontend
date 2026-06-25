@@ -55,7 +55,7 @@ export function AvatarUploader({ user }: { user: MeProfile }) {
     <div className="relative">
       <UserAvatar
         key={version}
-        name={user.displayName}
+        name={user.handle}
         mediaId={user.avatarMediaId}
         ownerId={user.linkId}
         mediaKey={user.avatarKey}

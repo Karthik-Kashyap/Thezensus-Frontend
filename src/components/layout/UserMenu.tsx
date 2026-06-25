@@ -36,7 +36,7 @@ export function UserMenu({ user }: { user: MeProfile }) {
     <DropdownMenu>
       <DropdownMenuTrigger className="rounded-full outline-none ring-offset-background focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
         <UserAvatar
-          name={user.displayName}
+          name={user.handle}
           mediaId={user.avatarMediaId}
           ownerId={user.linkId}
           mediaKey={user.avatarKey}
@@ -46,7 +46,7 @@ export function UserMenu({ user }: { user: MeProfile }) {
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
         <DropdownMenuLabel className="font-normal">
-          <div className="text-sm font-semibold text-foreground">{user.displayName}</div>
+          <div className="text-sm font-semibold text-foreground">{user.handle || user.linkId.slice(0, 12)}</div>
           <div className="truncate text-xs text-muted-foreground">{user.settings.email}</div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />

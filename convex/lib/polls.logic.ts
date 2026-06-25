@@ -338,7 +338,7 @@ export async function toPollDetail(
   ]);
   return {
     ...toSummaryFields(poll),
-    ...(creatorProfile?.displayName ? { creatorDisplayName: creatorProfile.displayName } : {}),
+    ...(creatorProfile?.handle ? { creatorHandle: creatorProfile.handle } : {}),
     requireLoginToVote: poll.requireLoginToVote,
     ...(poll.timezone !== undefined ? { timezone: poll.timezone } : {}),
     ...(creatorIsMember !== undefined ? { creatorIsMember } : {}),
@@ -368,7 +368,7 @@ export async function toFeedItem(
   const visible = comments.filter((c) => c.status === "ACTIVE");
   return {
     ...toSummaryFields(poll),
-    ...(creatorProfile?.displayName ? { creatorDisplayName: creatorProfile.displayName } : {}),
+    ...(creatorProfile?.handle ? { creatorHandle: creatorProfile.handle } : {}),
     currentEdition: edition,
     commentCount: Math.min(visible.length, COMMENT_COUNT_CAP),
     commentCountCapped: visible.length > COMMENT_COUNT_CAP,

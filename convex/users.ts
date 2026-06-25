@@ -51,7 +51,6 @@ export const getPublic = query({
 /** Partial profile edit across profile/demographics/settings docs (PATCH /users/me). */
 export const updateMe = mutation({
   args: {
-    displayName: v.optional(v.string()),
     bio: v.optional(v.string()),
     gender: v.optional(v.string()),
     region: v.optional(v.string()),
@@ -62,14 +61,8 @@ export const updateMe = mutation({
   handler: async (ctx, input) => {
     const actor = await requireActor(ctx);
 
-    // Field rules (the old validation schemas) — limits live in constants/profile.
-    if (input.displayName !== undefined) {
-      const name = input.displayName.trim();
-      if (name.length < PROFILE_LIMITS.displayNameMin || name.length > PROFILE_LIMITS.displayNameMax) {
-        throw badRequest("Display name must be 1–80 characters");
-      }
-      input = { ...input, displayName: name };
-    }
+    // Field rules (the old validation schemas) — limits live in constants/profile. The public
+    // identity is the auto-generated handle: it isn't user-editable, so there's nothing to set here.
     if (input.bio !== undefined && input.bio.length > PROFILE_LIMITS.bioMax) {
       throw badRequest("Bio too long");
     }
@@ -96,7 +89,6 @@ export const updateMe = mutation({
     }
 
     await updateProfile(ctx, actor.linkId, {
-      displayName: input.displayName,
       bio: input.bio,
       avatarMediaId: input.avatarMediaId,
       avatarKey,

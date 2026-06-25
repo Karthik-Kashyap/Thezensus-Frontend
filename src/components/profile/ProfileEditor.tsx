@@ -14,7 +14,6 @@ import { Select } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 interface FormState {
-  displayName: string;
   bio: string;
   gender: string;
   region: string;
@@ -58,7 +57,6 @@ export function ProfileEditor({ user }: { user: MeProfile }) {
       demographicsPublic: form.demographicsPublic,
       notifPrefs: form.notifPrefs,
     };
-    if (form.displayName.trim()) input.displayName = form.displayName.trim();
     if (form.gender) input.gender = form.gender;
     mutation.mutate(input);
   }
@@ -70,14 +68,15 @@ export function ProfileEditor({ user }: { user: MeProfile }) {
           <CardTitle>About you</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <Field label="Display name" htmlFor="displayName">
-            <Input
-              id="displayName"
-              maxLength={80}
-              value={form.displayName}
-              onChange={(e) => set("displayName", e.target.value)}
-            />
-          </Field>
+          <div className="space-y-1.5">
+            <Label>Handle</Label>
+            <p className="rounded-md border bg-muted/40 px-3 py-2 font-mono text-sm text-foreground">
+              {user.handle || user.linkId.slice(0, 12)}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Your public identity. Auto-assigned and not editable — we don’t show real names.
+            </p>
+          </div>
           <Field label="Bio" htmlFor="bio">
             <Textarea
               id="bio"
@@ -162,7 +161,6 @@ export function ProfileEditor({ user }: { user: MeProfile }) {
 
 function fromProfile(me: MeProfile): FormState {
   return {
-    displayName: me.displayName ?? "",
     bio: me.bio ?? "",
     gender: me.demographics.gender ?? "",
     region: me.demographics.region ?? "",

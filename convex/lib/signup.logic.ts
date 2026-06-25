@@ -17,7 +17,7 @@ import { getIdentity, insertIdentity, PROVIDER } from "./identities.model";
 import { getPiiByUserId, insertPii } from "./pii.model";
 import { insertUserItems } from "./users.model";
 import { appendConsent } from "./consent.model";
-import { ageInYears, deriveDisplayName } from "./users.logic";
+import { ageInYears } from "./users.logic";
 
 /** The consent decisions captured on the signup form (the 13+ affirmation is implicit + recorded). */
 export interface ConsentChoices {
@@ -28,8 +28,7 @@ export interface ConsentChoices {
 export interface CompleteSignupInput {
   subject: string; // the verified Google `sub` (from the signup-pending token)
   email: string;
-  legalName?: string;
-  displayName?: string;
+  legalName?: string; // PII-vault only (legal hold); never the public identity
   birthDate: string; // YYYY-MM-DD
   consent: ConsentChoices;
 }
@@ -57,12 +56,11 @@ export async function completeSignup(ctx: MutationCtx, input: CompleteSignupInpu
 
   const userId = newUserId();
   const birthYear = Number(input.birthDate.slice(0, 4));
-  const handle = deriveDisplayName(input.email, input.displayName);
 
   // The users doc goes in first: its _id IS the new linkId (all one transaction, so
-  // ordering is about data flow, not atomicity).
+  // ordering is about data flow, not atomicity). A unique cosmos handle is assigned inside
+  // insertUserItems — the public identity, derived from nothing the user typed.
   const linkId = await insertUserItems(ctx, {
-    displayName: handle,
     demographicsConsent: input.consent.demographics,
     birthYear,
   });

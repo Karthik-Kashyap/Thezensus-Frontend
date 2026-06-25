@@ -18,13 +18,6 @@ export function ageInYears(birthDate: string, now: Date): number {
   return age;
 }
 
-export function deriveDisplayName(email: string, provided?: string): string {
-  const trimmed = provided?.trim();
-  if (trimmed) return trimmed;
-  const local = email.split("@")[0];
-  return local || "New User";
-}
-
 const EMPTY_STATS = { pollsCreated: 0, totalVotesReceived: 0, votesCast: 0 };
 
 function toStats(stats: Doc<"userStats"> | null) {
@@ -48,7 +41,7 @@ export function toMe(
   const { profile, demographics, settings, moderation } = user;
   return {
     linkId,
-    displayName: profile?.displayName ?? "",
+    handle: profile?.handle ?? "",
     bio: profile?.bio,
     avatarMediaId: profile?.avatarMediaId,
     avatarKey: profile?.avatarKey,
@@ -81,7 +74,7 @@ export function toPublic(linkId: string, user: UserAggregate) {
   const { profile, demographics } = user;
   return {
     linkId,
-    displayName: profile?.displayName ?? "",
+    handle: profile?.handle ?? "",
     bio: profile?.bio,
     avatarMediaId: profile?.avatarMediaId,
     avatarKey: profile?.avatarKey,

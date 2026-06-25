@@ -29,7 +29,8 @@ export interface ProfileStats {
  */
 export interface MeProfile {
   linkId: string;
-  displayName: string;
+  /** Auto-generated cosmos handle (`Pulsar-4821`) — the only public identity; no real name. */
+  handle: string;
   bio?: string;
   avatarMediaId?: string;
   avatarKey?: string;
@@ -55,7 +56,8 @@ export interface MeProfile {
 /** Another user's public profile (no settings/email/age; demographics only if public). */
 export interface PublicProfile {
   linkId: string;
-  displayName: string;
+  /** Auto-generated cosmos handle (`Pulsar-4821`) — the only public identity; no real name. */
+  handle: string;
   bio?: string;
   avatarMediaId?: string;
   avatarKey?: string;
@@ -65,7 +67,6 @@ export interface PublicProfile {
 }
 
 export interface UpdateProfileInput {
-  displayName?: string;
   bio?: string;
   gender?: string;
   region?: string;
@@ -78,7 +79,6 @@ export interface UpdateProfileInput {
 /** POST /auth/signup/complete — age gate + baseline consent for a first-time identity (ADR-008/009). */
 export interface CompleteSignupInput {
   birthDate: string; // YYYY-MM-DD (full DOB; server enforces 13+)
-  displayName?: string;
   consent: { demographics: boolean; marketingEmail: boolean };
 }
 
@@ -207,8 +207,8 @@ export interface EditionList {
 export interface Poll {
   pollId: string;
   creatorId: string;
-  /** The creator's display name, resolved server-side (absent if the profile is gone). */
-  creatorDisplayName?: string;
+  /** The creator's cosmos handle, resolved server-side (absent if the profile is gone). */
+  creatorHandle?: string;
   audienceType: AudienceType;
   communityId?: string;
   question: string;
@@ -274,7 +274,7 @@ export interface SliceResult {
 export interface PollListItem {
   pollId: string;
   creatorId: string;
-  creatorDisplayName?: string;
+  creatorHandle?: string;
   audienceType: AudienceType;
   communityId?: string;
   question: string;
@@ -378,7 +378,10 @@ export type CommentStatus = "ACTIVE" | "REMOVED";
 export interface Comment {
   pollId: string;
   commentId: string;
+  /** Author's linkId pseudonym — used for ownership checks/routing, not shown as text. */
   authorId: string;
+  /** Author's cosmos handle, resolved server-side (absent if the author was deleted). */
+  authorHandle?: string;
   text: string;
   status: CommentStatus;
   createdAt: string;

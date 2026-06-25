@@ -30,7 +30,7 @@ export function ProfileView({ profile }: { profile: PublicProfile }) {
         <CardContent className="-mt-10 space-y-4">
           <div className="flex items-end justify-between">
             <UserAvatar
-              name={profile.displayName}
+              name={profile.handle}
               mediaId={profile.avatarMediaId}
               ownerId={profile.linkId}
               mediaKey={profile.avatarKey}
@@ -48,7 +48,7 @@ export function ProfileView({ profile }: { profile: PublicProfile }) {
           </div>
           <div>
             <h1 className="font-display text-2xl font-semibold tracking-tight">
-              {profile.displayName}
+              {profile.handle || profile.linkId.slice(0, 12)}
             </h1>
             <p className="text-sm text-muted-foreground">joined {relativeTime(profile.createdAt)}</p>
           </div>

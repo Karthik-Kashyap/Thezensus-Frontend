@@ -122,7 +122,7 @@ export function PollCard({
         href={routes.profile(poll.creatorId)}
         className="mt-1 inline-block text-xs text-muted-foreground transition hover:text-foreground"
       >
-        by {poll.creatorDisplayName ?? poll.creatorId.slice(0, 8)}
+        by {poll.creatorHandle ?? poll.creatorId.slice(0, 8)}
       </Link>
 
       <PollImage

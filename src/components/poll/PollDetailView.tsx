@@ -91,7 +91,7 @@ export function PollDetailView({
         )}
         <span>·</span>
         <Link href={routes.profile(poll.creatorId)} className="hover:text-foreground">
-          {poll.creatorDisplayName ?? poll.creatorId.slice(0, 12)}
+          {poll.creatorHandle ?? poll.creatorId.slice(0, 12)}
         </Link>
         <span>·</span>
         <span>{relativeTime(poll.createdAt)}</span>

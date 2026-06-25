@@ -2,11 +2,13 @@
 
 import type { Recurrence } from "./types";
 
-/** Up-to-two-letter initials from a display name, for avatar fallbacks. */
+/** Up-to-two-letter initials for an avatar fallback. Works on a cosmos handle
+ *  (`Pulsar-4821` → "PU") by taking the leading letters of the word before the `-`. */
 export function initials(name?: string | null): string {
   if (!name) return "?";
-  const parts = name.trim().split(/\s+/).slice(0, 2);
-  return parts.map((p) => p[0]?.toUpperCase() ?? "").join("") || "?";
+  const word = name.trim().split(/[\s-]+/)[0] ?? "";
+  const letters = word.replace(/[^a-zA-Z]/g, "");
+  return letters.slice(0, 2).toUpperCase() || "?";
 }
 
 /** Compact relative time, e.g. "3m", "5h", "2d", or a date for older items. */

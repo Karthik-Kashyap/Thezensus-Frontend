@@ -11,7 +11,6 @@ import { COOKIE, readSignupPending, signSession, setCookie, clearCookie } from "
 
 interface Body {
   birthDate?: string;
-  displayName?: string;
   consent?: { demographics?: boolean; marketingEmail?: boolean };
 }
 
@@ -39,8 +38,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   const outcome = await createAccount({
     subject: pending.sub,
     email: pending.email,
-    legalName: pending.name,
-    displayName: body.displayName,
+    legalName: pending.name, // → PII vault only (legal hold); never the public identity
     birthDate: body.birthDate,
     consent: {
       demographics: body.consent.demographics === true,

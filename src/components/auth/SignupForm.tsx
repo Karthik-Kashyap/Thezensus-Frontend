@@ -39,19 +39,12 @@ function toBirthDate(day: string, month: string, year: string): string | null {
  * (403 → nothing stored) and requires the signup-pending cookie set by the OAuth callback
  * (a 400 means there's no pending signup — the user must start sign-in again).
  */
-export function SignupForm({
-  defaultDisplayName,
-  returnTo,
-}: {
-  defaultDisplayName?: string;
-  returnTo?: string;
-}) {
+export function SignupForm({ returnTo }: { returnTo?: string }) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const [birthDay, setBirthDay] = useState("");
   const [birthMonth, setBirthMonth] = useState("");
   const [birthYear, setBirthYear] = useState("");
-  const [displayName, setDisplayName] = useState(defaultDisplayName ?? "");
   const [demographics, setDemographics] = useState(false);
   const [marketingEmail, setMarketingEmail] = useState(false);
   const [rejection, setRejection] = useState<Rejection>(null);
@@ -77,7 +70,6 @@ export function SignupForm({
     if (!birthDate) return toast.error("Please enter a valid date of birth.");
     mutation.mutate({
       birthDate,
-      displayName: displayName.trim() || undefined,
       consent: { demographics, marketingEmail },
     });
   }
@@ -118,17 +110,6 @@ export function SignupForm({
       </CardHeader>
       <CardContent>
         <form onSubmit={onSubmit} className="space-y-5">
-          <div className="space-y-1.5">
-            <Label htmlFor="displayName">Display name (optional)</Label>
-            <Input
-              id="displayName"
-              maxLength={80}
-              placeholder="How you’ll appear to others"
-              value={displayName}
-              onChange={(e) => setDisplayName(e.target.value)}
-            />
-          </div>
-
           <div className="space-y-1.5">
             <Label htmlFor="birthDay">Date of birth</Label>
             <div className="grid grid-cols-[1fr_5rem_6rem] gap-2">

@@ -47,7 +47,7 @@ export default function MyProfilePage() {
             <AvatarUploader user={user} />
           </div>
           <div>
-            <h1 className="font-display text-2xl font-semibold tracking-tight">{user.displayName}</h1>
+            <h1 className="font-display text-2xl font-semibold tracking-tight">{user.handle || user.linkId.slice(0, 12)}</h1>
             <p className="text-sm text-muted-foreground">
               {user.settings.email} · joined {relativeTime(user.createdAt)}
             </p>

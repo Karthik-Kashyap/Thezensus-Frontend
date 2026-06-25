@@ -17,8 +17,7 @@ export async function resolveLogin(subject: string): Promise<LoginResolution> {
 export interface CreateAccountInput {
   subject: string;
   email: string;
-  legalName?: string;
-  displayName?: string;
+  legalName?: string; // PII-vault only (legal hold); never the public identity
   birthDate: string;
   consent: { demographics: boolean; marketingEmail: boolean };
 }

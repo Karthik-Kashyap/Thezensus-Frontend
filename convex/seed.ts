@@ -74,8 +74,7 @@ export const seedUsers = mutation({
       const res = await completeSignup(ctx, {
         subject: u.subject,
         email: u.email,
-        legalName: u.displayName,
-        displayName: u.displayName,
+        legalName: u.displayName, // seed's name → PII vault only; public identity is the generated handle
         birthDate: u.birthDate,
         consent: { demographics: consent, marketingEmail: false },
       });

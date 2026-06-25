@@ -65,11 +65,13 @@ export function CommentItem({
         </ComingSoon>
       </div>
 
-      <UserAvatar name={comment.authorId} className="h-8 w-8" />
+      <UserAvatar name={comment.authorHandle ?? comment.authorId} className="h-8 w-8" />
 
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          <span className="font-semibold text-foreground">{comment.authorId.slice(0, 12)}</span>
+          <span className="font-semibold text-foreground">
+            {comment.authorHandle ?? comment.authorId.slice(0, 12)}
+          </span>
           <span>·</span>
           <span>{relativeTime(comment.createdAt)}</span>
           {comment.updatedAt && <span>(edited)</span>}

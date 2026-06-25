@@ -12,8 +12,6 @@ export const GENDER_OPTIONS = [
 export const NOTIF_CHANNELS = ["email", "push"] as const;
 
 export const PROFILE_LIMITS = {
-  displayNameMin: 1,
-  displayNameMax: 80,
   bioMax: 280,
   regionMax: 16,
 } as const;

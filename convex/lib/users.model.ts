@@ -4,8 +4,29 @@
 
 import type { QueryCtx, MutationCtx } from "../_generated/server";
 import type { Doc } from "../_generated/dataModel";
+import { generateHandleCandidate } from "./handles.logic";
+import { HANDLE_MAX_ATTEMPTS } from "./constants/handles";
 
 type Ctx = QueryCtx | MutationCtx;
+
+/**
+ * Allocate a unique cosmos handle (`Pulsar-4821`). Random candidate → by_handle lookup →
+ * retry on collision, widening the discriminator as attempts climb (handles.logic). Uniqueness
+ * is guaranteed: this runs inside the signup transaction, so a concurrent identical insert
+ * lands in the same read/write set and OCC retries the loser, which then sees the taken handle.
+ * Reads reflect writes earlier in the same mutation, so backfilling many in one pass is safe too.
+ */
+export async function assignUniqueHandle(ctx: MutationCtx): Promise<string> {
+  for (let attempt = 0; attempt < HANDLE_MAX_ATTEMPTS; attempt++) {
+    const candidate = generateHandleCandidate(attempt);
+    const taken = await ctx.db
+      .query("users")
+      .withIndex("by_handle", (q) => q.eq("handle", candidate))
+      .unique();
+    if (!taken) return candidate;
+  }
+  throw new Error("Could not allocate a unique handle after maximum attempts");
+}
 
 export interface UserAggregate {
   profile: Doc<"users"> | null;
@@ -83,7 +104,6 @@ export async function bumpUserStats(
 // ── Writes (patch only the fields provided; undefined = leave unchanged) ─────
 
 export interface ProfilePatch {
-  displayName?: string;
   bio?: string;
   avatarMediaId?: string;
   avatarKey?: string;
@@ -128,16 +148,17 @@ export async function updateSettings(
 // ── Account creation (the per-table inserts of the signup transaction) ───────
 
 export interface InsertUserItemsInput {
-  displayName: string;
   demographicsConsent: boolean;
   birthYear?: number; // written only with demographics consent
 }
 
 /** Inserts the users doc FIRST — its `_id` is the account's brand-new linkId — then the
- *  satellite docs keyed by it. Returns the linkId for the vault row + session. */
+ *  satellite docs keyed by it. The public identity is an auto-generated handle (no real name).
+ *  Returns the linkId for the vault row + session. */
 export async function insertUserItems(ctx: MutationCtx, input: InsertUserItemsInput): Promise<string> {
-  const { displayName, demographicsConsent, birthYear } = input;
-  const linkId = await ctx.db.insert("users", { displayName });
+  const { demographicsConsent, birthYear } = input;
+  const handle = await assignUniqueHandle(ctx);
+  const linkId = await ctx.db.insert("users", { handle });
   await ctx.db.insert("userStats", { linkId, pollsCreated: 0, totalVotesReceived: 0, votesCast: 0 });
   await ctx.db.insert("userDemographics", {
     linkId,

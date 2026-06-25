@@ -71,15 +71,17 @@ export default defineSchema({
 
   // ── Users (PII-free, keyed by linkId) ─────────────────────────────────────
 
-  /** Public identity (the chosen handle, not the legal name). DDB Users.PROFILE.
+  /** Public identity — an auto-generated cosmos handle (`Pulsar-4821`), NOT a real/Google name.
    *  The doc `_id` IS the linkId — the pseudonym every other table references. */
   users: defineTable({
-    displayName: v.string(),
+    // The sole public identity (`Pulsar-4821`), assigned at signup, unique via by_handle.
+    // Required: there is no real-name field on this table by design.
+    handle: v.string(),
     bio: v.optional(v.string()),
     avatarMediaId: v.optional(v.string()),
     avatarKey: v.optional(v.string()), // denormalized READY serving key, one-hop render
     tier: v.optional(v.union(v.literal("free"), v.literal("pro"))), // absent ⇒ free; the slicing paywall lever (DESIGN-008)
-  }),
+  }).index("by_handle", ["handle"]),
 
   /** Public counters. Separate doc so stat bumps never OCC-contend with profile edits. */
   userStats: defineTable({
@@ -398,6 +400,10 @@ export default defineSchema({
     commentId: v.string(),
     pollId: v.string(),
     authorId: v.optional(v.string()), // linkId; cleared to "[deleted]" semantics by erasure
+    // Denormalized author handle — the byline shown to users. Safe to copy because handles are
+    // immutable (assigned once, never editable), so it can't go stale. Cleared on erasure
+    // alongside authorId. Optional: absent on erased authors + pre-backfill rows.
+    authorHandle: v.optional(v.string()),
     text: v.string(),
     status: v.union(v.literal("ACTIVE"), v.literal("REMOVED")),
     modStatus: v.optional(v.string()),

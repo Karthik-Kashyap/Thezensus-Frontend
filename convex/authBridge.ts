@@ -36,8 +36,7 @@ export const createAccount = mutation({
     secret: v.string(),
     subject: v.string(),
     email: v.string(),
-    legalName: v.optional(v.string()),
-    displayName: v.optional(v.string()),
+    legalName: v.optional(v.string()), // PII-vault only; never the public identity
     birthDate: v.string(), // YYYY-MM-DD; 13+ enforced in logic (ADR-008)
     consent: v.object({ demographics: v.boolean(), marketingEmail: v.boolean() }),
   },

@@ -18,6 +18,7 @@ import {
   toCommentView,
 } from "./lib/comments.logic";
 import { getComment, commentsByPoll, commentsByAuthor } from "./lib/comments.model";
+import { getProfile } from "./lib/users.model";
 
 /** POST /comments — signed-in only; poll visibility/ban/token gates apply. */
 export const create = mutation({
@@ -30,10 +31,13 @@ export const create = mutation({
     if (!poll || isHidden(poll)) throw notFound("Poll not found");
     await assertCanComment(ctx, poll, actor.linkId, token);
 
+    // Denormalize the author's (immutable) handle onto the row so the byline needs no read.
+    const authorHandle = (await getProfile(ctx, actor.linkId))?.handle;
     const id = await ctx.db.insert("comments", {
       commentId: newCommentId(),
       pollId,
       authorId: actor.linkId,
+      ...(authorHandle ? { authorHandle } : {}),
       text: cleanText,
       status: COMMENT_STATUS.ACTIVE,
     });

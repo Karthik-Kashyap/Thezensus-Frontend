@@ -18,6 +18,7 @@ import type * as lib_actor from "../lib/actor.js";
 import type * as lib_bridge from "../lib/bridge.js";
 import type * as lib_constants_community from "../lib/constants/community.js";
 import type * as lib_constants_consent from "../lib/constants/consent.js";
+import type * as lib_constants_handles from "../lib/constants/handles.js";
 import type * as lib_constants_media from "../lib/constants/media.js";
 import type * as lib_constants_moderation from "../lib/constants/moderation.js";
 import type * as lib_constants_poll from "../lib/constants/poll.js";
@@ -56,6 +57,7 @@ declare const fullApi: ApiFromModules<{
   "lib/bridge": typeof lib_bridge;
   "lib/constants/community": typeof lib_constants_community;
   "lib/constants/consent": typeof lib_constants_consent;
+  "lib/constants/handles": typeof lib_constants_handles;
   "lib/constants/media": typeof lib_constants_media;
   "lib/constants/moderation": typeof lib_constants_moderation;
   "lib/constants/poll": typeof lib_constants_poll;

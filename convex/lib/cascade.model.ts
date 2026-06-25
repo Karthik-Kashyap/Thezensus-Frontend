@@ -6,7 +6,7 @@
 //   votes          → HARD DELETE by the sparse by_linkId index (de-identifies the voter;
 //                    voteEvents carry no identity, so published aggregates are untouched —
 //                    "the user still counts in aggregates" by construction)
-//   comments       → REDACT: authorId cleared; text kept; renders as "[deleted]"
+//   comments       → REDACT: authorId + authorHandle cleared; text kept; renders as "[deleted]"
 //   subscriptions  → delete + decrement each community's best-effort subscriberCount
 //   media          → delete rows EXCEPT status=PRESERVED (legal evidence outlives the
 //                    account; S3 objects are the media domain's sweep concern)
@@ -46,7 +46,9 @@ export async function cascadeDeleteByLinkId(
     .query("comments")
     .withIndex("by_author", (q) => q.eq("authorId", linkId))
     .collect();
-  for (const comment of comments) await ctx.db.patch(comment._id, { authorId: undefined });
+  for (const comment of comments) {
+    await ctx.db.patch(comment._id, { authorId: undefined, authorHandle: undefined });
+  }
 
   // Subscriptions — delete + fix the approximate counters.
   const subs = await ctx.db

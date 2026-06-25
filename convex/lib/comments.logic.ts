@@ -64,10 +64,13 @@ export async function canModerateThread(
 }
 
 export function toCommentView(comment: Doc<"comments">): Record<string, unknown> {
+  // authorHandle is denormalized onto the comment at write time (handles are immutable, so the
+  // copy can't go stale) — no per-render profile read. Both are cleared on erasure ⇒ "[deleted]".
   return {
     pollId: comment.pollId,
     commentId: comment.commentId,
     authorId: comment.authorId ?? "[deleted]",
+    ...(comment.authorHandle ? { authorHandle: comment.authorHandle } : {}),
     text: comment.text,
     status: comment.status,
     createdAt: new Date(comment._creationTime).toISOString(),
