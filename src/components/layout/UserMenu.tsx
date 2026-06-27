@@ -47,7 +47,6 @@ export function UserMenu({ user }: { user: MeProfile }) {
       <DropdownMenuContent align="end">
         <DropdownMenuLabel className="font-normal">
           <div className="text-sm font-semibold text-foreground">{user.handle || user.linkId.slice(0, 12)}</div>
-          <div className="truncate text-xs text-muted-foreground">{user.settings.email}</div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuItem asChild>

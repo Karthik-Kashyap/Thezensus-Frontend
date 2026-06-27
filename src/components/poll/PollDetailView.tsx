@@ -9,7 +9,7 @@ import type { Poll } from "@/lib/types";
 import { getCommunity } from "@/lib/communities";
 import { useSession } from "@/lib/session";
 import { routes } from "@/lib/constants";
-import { relativeTime } from "@/lib/format";
+import { relativeTime, formatEditionLabel } from "@/lib/format";
 import { ANONYMOUS_HINT, recurrenceHint } from "@/lib/pollHints";
 import { Badge } from "@/components/ui/badge";
 import { InfoHint } from "@/components/common/InfoHint";
@@ -22,8 +22,8 @@ import { DeletePollButton } from "./DeletePollButton";
 import { EditPollButton } from "./EditPollButton";
 import { VoteCount } from "./VoteCount";
 import { NextEditionCountdown } from "./NextEditionCountdown";
-import { AnalyticsStub } from "./AnalyticsStub";
 import { SlicePanel } from "./SlicePanel";
+import { DemographicBreakdown } from "./DemographicBreakdown";
 import { CommentsSection } from "@/components/comment/CommentsSection";
 import { ReportButton } from "@/components/moderation/ReportDialog";
 import { PageContainer } from "@/components/layout/PageContainer";
@@ -100,7 +100,7 @@ export function PollDetailView({
         {poll.recurrence !== "NONE" && (
           <InfoHint content={recurrenceHint(poll.recurrence, poll.recurrenceStart, poll.recurrenceEnd)}>
             <Badge variant="outline" className="gap-1">
-              <Repeat className="h-3 w-3" /> {poll.currentEdition.label}
+              <Repeat className="h-3 w-3" /> {formatEditionLabel(poll.recurrence, poll.currentEdition.label)}
             </Badge>
           </InfoHint>
         )}
@@ -160,15 +160,14 @@ export function PollDetailView({
         </CardContent>
       </Card>
 
-      {poll.segmentSchema && poll.segmentSchema.length > 0 && (
-        <div className="mt-6">
-          <SlicePanel poll={poll} token={token} />
-        </div>
-      )}
-
-      {isCreator && (
-        <div className="mt-6">
-          <AnalyticsStub />
+      {/* Result breakdowns: paywalled segment cross-tab (community polls with segments) +
+          the free demographic marginals (any standard/attributable ballot). */}
+      {((poll.segmentSchema?.length ?? 0) > 0 || poll.ballotMode === "standard") && (
+        <div className="mt-6 flex flex-col gap-3">
+          {poll.segmentSchema && poll.segmentSchema.length > 0 && (
+            <SlicePanel poll={poll} token={token} />
+          )}
+          {poll.ballotMode === "standard" && <DemographicBreakdown poll={poll} token={token} />}
         </div>
       )}
 

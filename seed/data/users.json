@@ -41,7 +41,7 @@
   "genders": [
     "female", "female", "female", "male", "male", "male", "nonbinary", "other", "prefer_not_to_say"
   ],
-  "regions": [
+  "locations": [
     "US-CA", "US-NY", "US-TX", "US-WA", "US-IL", "US-FL", "GB-ENG", "CA-ON",
     "AU-NSW", "IN-KA", "DE-BE", "BR-SP"
   ],

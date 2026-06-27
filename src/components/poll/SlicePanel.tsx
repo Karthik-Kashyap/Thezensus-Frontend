@@ -4,19 +4,20 @@ import { useEffect, useMemo, useState } from "react";
 import { useQuery as useConvexQuery } from "convex/react";
 import { BarChart3, Lock } from "lucide-react";
 import { api } from "../../../convex/_generated/api";
-import type { Poll, PollOption, SliceResult } from "@/lib/types";
+import type { Poll, SliceResult } from "@/lib/types";
 import { useSession } from "@/lib/session";
 import { compactNumber } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { SliceBars } from "./SliceBars";
 
 // Mirrors TIER_DIM_LIMITS in convex/lib/constants/slicing.ts. The backend enforces it (403);
 // this only gates the UI so over-limit chips lock instead of erroring.
 const TIER_LIMITS: Record<string, number> = { free: 2, pro: 5 };
 
 /**
- * "Break down results" — slice a poll's option bars by community segments (DESIGN-008). Activate
+ * "Break down by community questions" — slice a poll's option bars by community segments (DESIGN-008). Activate
  * up to your tier's limit of segments, pick a value for each, and the SAME option bars refill for
  * that subgroup, with a faint ghost showing the overall baseline. Fetches the cross-tab once per
  * active-segment set; switching values is instant (every cell is already in the response).
@@ -90,7 +91,7 @@ export function SlicePanel({ poll, token }: { poll: Poll; token?: string }) {
   if (!open) {
     return (
       <Button variant="outline" size="sm" className="gap-2" onClick={() => setOpen(true)}>
-        <BarChart3 className="h-4 w-4" /> Break down results
+        <BarChart3 className="h-4 w-4" /> Break down by community questions
       </Button>
     );
   }
@@ -99,7 +100,7 @@ export function SlicePanel({ poll, token }: { poll: Poll; token?: string }) {
     <Card>
       <CardContent className="space-y-4 pt-5">
         <div className="flex items-center justify-between">
-          <span className="font-display text-lg font-semibold">Break down results</span>
+          <span className="font-display text-lg font-semibold">Break down by community questions</span>
           <button onClick={() => setOpen(false)} className="text-sm text-muted-foreground hover:text-foreground">
             Hide
           </button>
@@ -193,58 +194,5 @@ export function SlicePanel({ poll, token }: { poll: Poll; token?: string }) {
         )}
       </CardContent>
     </Card>
-  );
-}
-
-/** The option bars — a faint ghost at the overall baseline %, a solid fill at the subgroup %.
- *  Mirrors PollResults' look; widths animate so the bars visibly refill when values change. */
-function SliceBars({
-  options,
-  subCounts,
-  subTotal,
-  baseCounts,
-  baseTotal,
-}: {
-  options: PollOption[];
-  subCounts: Record<string, number>;
-  subTotal: number;
-  baseCounts: Record<string, number>;
-  baseTotal: number;
-}) {
-  const [grown, setGrown] = useState(false);
-  useEffect(() => {
-    const id = requestAnimationFrame(() => setGrown(true));
-    return () => cancelAnimationFrame(id);
-  }, []);
-
-  return (
-    <div className="space-y-2.5">
-      {options.map((o, i) => {
-        const count = subCounts[o.id] ?? 0;
-        const pct = subTotal > 0 ? Math.round((count / subTotal) * 100) : 0;
-        const basePct = baseTotal > 0 ? Math.round(((baseCounts[o.id] ?? 0) / baseTotal) * 100) : 0;
-        return (
-          <div key={o.id} className="relative overflow-hidden rounded-lg border border-border px-4 py-3">
-            <div
-              className="absolute inset-y-0 left-0 bg-primary/10 transition-[width] duration-700 ease-out"
-              style={{ width: grown ? `${basePct}%` : "0%" }}
-              aria-hidden
-            />
-            <div
-              className="absolute inset-y-0 left-0 bg-primary/30 transition-[width] duration-700 ease-out"
-              style={{ width: grown ? `${pct}%` : "0%", transitionDelay: `${i * 80}ms` }}
-              aria-hidden
-            />
-            <div className="relative flex items-center justify-between gap-3">
-              <span className="font-medium">{o.label}</span>
-              <span className="flex items-center gap-2 text-sm tabular-nums text-muted-foreground">
-                <span className="font-semibold text-foreground">{pct}%</span>
-                <span>{compactNumber(count)}</span>
-              </span>
-            </div>
-          </div>
-        );
-      })}
-    </div>
   );
 }

@@ -13,5 +13,5 @@ export const NOTIF_CHANNELS = ["email", "push"] as const;
 
 export const PROFILE_LIMITS = {
   bioMax: 280,
-  regionMax: 16,
 } as const;
+// Geo demographics limits/validation (country/state) live in ./geo (DESIGN-008 region split).

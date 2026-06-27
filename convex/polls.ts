@@ -17,8 +17,10 @@ import {
   DEFAULT_RECURRENCE,
   FEED_PAGE,
   POLL_LIMITS,
+  MAX_EDITIONS,
+  INTERVAL_MINUTES_ALLOWED,
 } from "./lib/constants/poll";
-import { isTimeBased } from "./lib/editions.logic";
+import { isTimeBased, cappedEnd } from "./lib/editions.logic";
 import {
   validateQuestion,
   validateOptions,
@@ -38,6 +40,7 @@ import {
   discoverFeedItems,
   publiclyListable,
   initialEditionLabel,
+  validateRecurrenceInterval,
 } from "./lib/polls.logic";
 import { getPoll, pollsByCommunity, pollsByCreator } from "./lib/polls.model";
 import { bumpUserStats } from "./lib/users.model";
@@ -76,9 +79,11 @@ export const create = mutation({
         v.literal("WEEKLY"),
         v.literal("MONTHLY"),
         v.literal("YEARLY"),
+        v.literal("INTERVAL"),
         v.literal("MANUAL"),
       ),
     ),
+    intervalMinutes: v.optional(v.number()),
     timezone: v.optional(v.string()),
     recurrenceStart: v.optional(v.string()),
     recurrenceEnd: v.optional(v.string()),
@@ -97,6 +102,19 @@ export const create = mutation({
     if (isTimeBased(recurrence) && input.timezone === undefined) {
       throw badRequest("Time-based recurrence requires a timezone");
     }
+    // INTERVAL carries a whitelisted slot length; other cadences must not. Throws on mismatch.
+    const intervalMinutes = validateRecurrenceInterval(recurrence, input.intervalMinutes);
+    // The 60-edition cap, materialized as a concrete recurrenceEnd at create time so the existing
+    // compute-don't-roll window math auto-closes the poll with no scheduler (DESIGN-013). Honors an
+    // earlier creator-supplied end; leaves NONE/MANUAL untouched.
+    const recurrenceEnd = cappedEnd(
+      recurrence,
+      input.timezone,
+      intervalMinutes,
+      new Date(),
+      MAX_EDITIONS,
+      input.recurrenceEnd,
+    );
 
     // Validate + denormalize any attached images (owned by the creator, right kind, READY).
     const media = await resolvePollMedia(ctx, actor.linkId, input.questionMediaId, input.options);
@@ -115,14 +133,15 @@ export const create = mutation({
       ballotMode: input.ballotMode ?? DEFAULT_BALLOT_MODE,
       requireLoginToVote: input.requireLoginToVote ?? true,
       recurrence,
+      ...(intervalMinutes !== undefined ? { intervalMinutes } : {}),
       timezone: input.timezone,
       recurrenceStart: input.recurrenceStart,
-      recurrenceEnd: input.recurrenceEnd,
+      recurrenceEnd,
       status: POLL_STATUS.ACTIVE,
       tags: input.tags,
       category: input.category,
       shareCardShowResults: input.shareCardShowResults,
-      currentEdition: initialEditionLabel(recurrence, input.timezone),
+      currentEdition: initialEditionLabel(recurrence, input.timezone, intervalMinutes),
     };
 
     if (audienceType === POLL_AUDIENCE.COMMUNITY) {
@@ -158,6 +177,39 @@ export const create = mutation({
 
     const poll = (await getPoll(ctx, base.pollId))!;
     return await toPollDetail(ctx, poll, await editionView(ctx, poll), actor.linkId);
+  },
+});
+
+/**
+ * GET — the schedule preview for a (not-yet-created) recurring poll: how many editions it will
+ * run and when it ends. Pure computation (no DB / no auth) that reuses the SAME `cappedEnd` the
+ * create path stamps, so the create form can show "60 editions · ends …" without duplicating the
+ * timezone-aware cap math on the client. Returns null for one-off / MANUAL or an invalid interval.
+ */
+export const previewSchedule = query({
+  args: {
+    recurrence: v.union(
+      v.literal("NONE"),
+      v.literal("DAILY"),
+      v.literal("WEEKLY"),
+      v.literal("MONTHLY"),
+      v.literal("YEARLY"),
+      v.literal("INTERVAL"),
+      v.literal("MANUAL"),
+    ),
+    intervalMinutes: v.optional(v.number()),
+    timezone: v.optional(v.string()),
+  },
+  handler: async (_ctx, { recurrence, intervalMinutes, timezone }) => {
+    if (!isTimeBased(recurrence)) return null;
+    if (
+      recurrence === "INTERVAL" &&
+      (intervalMinutes === undefined || !INTERVAL_MINUTES_ALLOWED.has(intervalMinutes))
+    ) {
+      return null;
+    }
+    const endLabel = cappedEnd(recurrence, timezone, intervalMinutes, new Date(), MAX_EDITIONS);
+    return endLabel ? { maxEditions: MAX_EDITIONS, endLabel } : null;
   },
 });
 

@@ -33,9 +33,30 @@ export const RECURRENCE = {
   WEEKLY: "WEEKLY",
   MONTHLY: "MONTHLY",
   YEARLY: "YEARLY",
+  // A fixed sub-daily / N-hour cadence (DESIGN-013). Unlike the calendar cadences above,
+  // the period length is parameterized by `intervalMinutes` on the poll. Editions snap to
+  // clean clock marks anchored to local midnight (e.g. 15m → :00/:15/:30/:45).
+  INTERVAL: "INTERVAL",
   MANUAL: "MANUAL",
 } as const;
 export type Recurrence = (typeof RECURRENCE)[keyof typeof RECURRENCE];
+
+/**
+ * The interval lengths (in minutes) a poll may pick for INTERVAL recurrence. Every value
+ * DIVIDES A DAY (1440 min) evenly, so editions tile each local day into equal slots with no
+ * partial slot at the midnight boundary — the property the clean-clock-mark math relies on.
+ * (12/15/30 min; 1/2/3/4/8/12 h.) Validate against this set before storing.
+ */
+export const INTERVAL_MINUTES_ALLOWED: ReadonlySet<number> = new Set([
+  10, 12, 15, 30, 60, 120, 180, 240, 480, 720,
+]);
+
+/** Hard ceiling on how many editions a recurring poll runs before voting auto-closes
+ *  (DESIGN-013). Enforced WITHOUT a scheduler: at create time the cap is converted to a
+ *  concrete `recurrenceEnd` label (the Nth edition), so the existing compute-don't-roll
+ *  window math closes the poll for everyone the instant the clock passes it. Matches
+ *  EDITION_HISTORY_MAX so a capped poll's slider can show its entire life. */
+export const MAX_EDITIONS = 60;
 
 export const POLL_STATUS = {
   ACTIVE: "ACTIVE",
@@ -154,11 +175,14 @@ export const SAFETY_SWEEP_SECONDS = 30;
 /** A drainScheduled shard whose lastArmedAt is older than this is presumed dead → re-armed. */
 export const DRAIN_STALE_MS = 15_000;
 
-/** Flattened demographic dimension keys on voteEvents ("gender#male", "seg:<id>#<answer>"). */
+/** Flattened demographic dimension keys on voteEvents ("gender#male", "seg:<id>#<answer>").
+ *  `region` was split into two flat marginals — `country` ("country#US") and `state`
+ *  ("state#US-CA") — per DESIGN-008. They never cross; each folds to its own dimCounts key. */
 export const TALLY_DIMENSION = {
   GENDER: "gender",
   AGE: "age",
-  REGION: "region",
+  COUNTRY: "country",
+  STATE: "state",
 } as const;
 
 export const SEGMENT_DIM_PREFIX = "seg:";

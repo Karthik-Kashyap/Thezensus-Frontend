@@ -5,6 +5,7 @@
 import { v } from "convex/values";
 import { query, mutation } from "./_generated/server";
 import { PROFILE_LIMITS, GENDER_OPTIONS, NOTIF_CHANNELS } from "./lib/constants/profile";
+import { GEO_LIMITS, isValidCountry, isValidState } from "./lib/constants/geo";
 import { MEDIA_KIND, MEDIA_STATUS } from "./lib/constants/media";
 import { optionalActor, requireActor, requireActorEvenIfBanned, isAdmin } from "./lib/actor";
 import { badRequest, notFound, conflict } from "./lib/errors";
@@ -53,7 +54,8 @@ export const updateMe = mutation({
   args: {
     bio: v.optional(v.string()),
     gender: v.optional(v.string()),
-    region: v.optional(v.string()),
+    country: v.optional(v.string()), // ISO-3166-1 alpha-2, e.g. "US"; "" clears
+    state: v.optional(v.string()), // ISO-3166-2, e.g. "US-CA"; "" clears
     demographicsPublic: v.optional(v.boolean()),
     notifPrefs: v.optional(v.array(v.string())),
     avatarMediaId: v.optional(v.string()),
@@ -69,8 +71,17 @@ export const updateMe = mutation({
     if (input.gender !== undefined && !(GENDER_OPTIONS as readonly string[]).includes(input.gender)) {
       throw badRequest("Invalid gender option");
     }
-    if (input.region !== undefined && input.region.length > PROFILE_LIMITS.regionMax) {
-      throw badRequest("Invalid region");
+    // Geo demographics (DESIGN-008): empty string → undefined (leave unchanged). country must
+    // be an assigned ISO-3166-1 alpha-2; state must be an ISO-3166-2 under that same country.
+    const country = input.country?.trim().toUpperCase() || undefined;
+    const state = input.state?.trim().toUpperCase() || undefined;
+    if (country !== undefined && (country.length > GEO_LIMITS.countryMax || !isValidCountry(country))) {
+      throw badRequest("Invalid country");
+    }
+    if (state !== undefined) {
+      if (country === undefined || state.length > GEO_LIMITS.stateMax || !isValidState(state, country)) {
+        throw badRequest("Invalid state");
+      }
     }
     if (input.notifPrefs?.some((c) => !(NOTIF_CHANNELS as readonly string[]).includes(c))) {
       throw badRequest("Invalid notification channel");
@@ -95,7 +106,8 @@ export const updateMe = mutation({
     });
     await updateDemographics(ctx, actor.linkId, {
       gender: input.gender,
-      region: input.region,
+      country,
+      state,
       demographicsPublic: input.demographicsPublic,
     });
     await updateSettings(ctx, actor.linkId, { notifPrefs: input.notifPrefs });

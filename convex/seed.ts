@@ -47,7 +47,7 @@ function assertSeedEnabled(): void {
 // ── Users ─────────────────────────────────────────────────────────────────────
 
 /** Creates persona accounts through the real signup transaction, then sets the
- *  PII-free demographics (gender/region) the breakdowns read. Returns index→linkId. */
+ *  PII-free demographics (gender/country/state) the breakdowns read. Returns index→linkId. */
 export const seedUsers = mutation({
   args: {
     users: v.array(
@@ -58,7 +58,8 @@ export const seedUsers = mutation({
         birthDate: v.string(), // YYYY-MM-DD, 13+
         bio: v.optional(v.string()),
         gender: v.optional(v.string()),
-        region: v.optional(v.string()),
+        country: v.optional(v.string()), // ISO-3166-1 alpha-2, e.g. "US"
+        state: v.optional(v.string()), // ISO-3166-2, e.g. "US-CA"
         birthYear: v.optional(v.number()),
         demographicsPublic: v.optional(v.boolean()),
         demographicsConsent: v.optional(v.boolean()),
@@ -76,7 +77,7 @@ export const seedUsers = mutation({
         email: u.email,
         legalName: u.displayName, // seed's name → PII vault only; public identity is the generated handle
         birthDate: u.birthDate,
-        consent: { demographics: consent, marketingEmail: false },
+        consent: { demographics: consent },
       });
       if (res.status === "underage") {
         out.push({ index: i, linkId: null, displayName: u.displayName });
@@ -89,7 +90,8 @@ export const seedUsers = mutation({
       }
       await updateDemographics(ctx, linkId, {
         gender: u.gender,
-        region: u.region,
+        country: u.country,
+        state: u.state,
         birthYear: consent ? u.birthYear : undefined,
         demographicsPublic: u.demographicsPublic ?? true,
         demographicsConsent: consent,

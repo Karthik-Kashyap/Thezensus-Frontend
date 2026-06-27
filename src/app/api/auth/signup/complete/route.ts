@@ -11,7 +11,9 @@ import { COOKIE, readSignupPending, signSession, setCookie, clearCookie } from "
 
 interface Body {
   birthDate?: string;
-  consent?: { demographics?: boolean; marketingEmail?: boolean };
+  // Optional; demographics defaults to granted server-side when omitted. Marketing email is
+  // not collected at signup yet.
+  consent?: { demographics?: boolean };
 }
 
 const DOB_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -31,19 +33,23 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   } catch {
     return NextResponse.json({ message: "Invalid JSON body" }, { status: 400 });
   }
-  if (!body.birthDate || !DOB_RE.test(body.birthDate) || typeof body.consent !== "object" || body.consent === null) {
-    return NextResponse.json({ message: "birthDate (YYYY-MM-DD) and consent are required" }, { status: 400 });
+  if (!body.birthDate || !DOB_RE.test(body.birthDate)) {
+    return NextResponse.json({ message: "birthDate (YYYY-MM-DD) is required" }, { status: 400 });
   }
+
+  // Forward demographics consent only if the client explicitly sent it; otherwise omit so the
+  // signup transaction applies its server-side default (granted).
+  const consent =
+    typeof body.consent?.demographics === "boolean"
+      ? { demographics: body.consent.demographics }
+      : undefined;
 
   const outcome = await createAccount({
     subject: pending.sub,
     email: pending.email,
     legalName: pending.name, // → PII vault only (legal hold); never the public identity
     birthDate: body.birthDate,
-    consent: {
-      demographics: body.consent.demographics === true,
-      marketingEmail: body.consent.marketingEmail === true,
-    },
+    consent,
   });
 
   if (outcome.status === "underage") {

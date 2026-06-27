@@ -12,7 +12,6 @@ import { Button } from "@/components/ui/button";
 import { LoginDialog } from "@/components/auth/LoginDialog";
 import { PollResults } from "./PollResults";
 import { PollImage } from "./PollImage";
-import { VoteCount } from "./VoteCount";
 import { cn } from "@/lib/utils";
 
 /**
@@ -145,8 +144,7 @@ export function VotePanel({
             mediaOwnerId={mediaOwnerId}
             mediaIsSelf={mediaIsSelf}
           />
-          <div className="flex items-center justify-between text-sm text-muted-foreground">
-            <VoteCount count={shownTotal} format={(n) => n.toLocaleString()} />
+          <div className="flex items-center justify-end text-sm text-muted-foreground">
             {hasVoted && open && user && !isAnonymous && (
               <button className="font-medium text-primary hover:underline" onClick={() => setChanging(true)}>
                 Change my vote

@@ -118,7 +118,8 @@ export async function updateProfile(ctx: MutationCtx, linkId: string, patch: Pro
 
 export interface DemographicsPatch {
   gender?: string;
-  region?: string;
+  country?: string;
+  state?: string;
   birthYear?: number;
   demographicsPublic?: boolean;
   demographicsConsent?: boolean;

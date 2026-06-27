@@ -7,13 +7,14 @@ import type { Recurrence } from "./types";
 export const ANONYMOUS_HINT =
   "Anonymous poll: your vote is counted but isn't included in any demographic breakdown, and you can't change your vote after casting.";
 
-/** What each cadence means in plain words (no time-of-day cadence exists — daily is the finest). */
+/** What each cadence means in plain words. */
 const CADENCE: Record<Recurrence, string> = {
   NONE: "A one-off poll.",
   DAILY: "Runs daily — a fresh edition opens every day and the count resets each day.",
   WEEKLY: "Runs weekly — a fresh edition opens every week and the count resets each week.",
   MONTHLY: "Runs monthly — a fresh edition opens every month and the count resets each month.",
   YEARLY: "Runs yearly — a fresh edition opens every year and the count resets each year.",
+  INTERVAL: "Runs on a fixed clock interval — a fresh edition opens at each mark and the count resets.",
   MANUAL: "Recurring poll: the creator opens a new edition manually whenever they choose.",
 };
 

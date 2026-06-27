@@ -19,7 +19,9 @@ export interface CreateAccountInput {
   email: string;
   legalName?: string; // PII-vault only (legal hold); never the public identity
   birthDate: string;
-  consent: { demographics: boolean; marketingEmail: boolean };
+  // Optional: demographics defaults to granted server-side when omitted (marketing email is
+  // not collected at signup yet).
+  consent?: { demographics?: boolean };
 }
 
 export type SignupOutcome =

@@ -1,29 +1,35 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { Eye, EyeOff } from "lucide-react";
+import { allCountries } from "country-region-data";
 import { updateMe } from "@/lib/profile";
-import { GENDER_OPTIONS, NOTIF_CHANNELS } from "@/lib/constants";
+import { GENDER_OPTIONS } from "@/lib/constants";
 import type { MeProfile, UpdateProfileInput } from "@/lib/types";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
+// country-region-data ships tuples: country = [name, isoCode, regions]; region = [name, isoCode].
+// Sorted by display name for the picker. Static data, so computed once at module load.
+const COUNTRIES = [...allCountries].sort((a, b) => a[0].localeCompare(b[0]));
+
 interface FormState {
   bio: string;
   gender: string;
-  region: string;
-  demographicsPublic: boolean;
-  notifPrefs: string[];
+  country: string; // ISO-3166-1 alpha-2, e.g. "US"
+  state: string; // ISO-3166-2, e.g. "US-CA"
 }
 
 export function ProfileEditor({ user }: { user: MeProfile }) {
   const queryClient = useQueryClient();
   const [form, setForm] = useState<FormState>(() => fromProfile(user));
+  // The sign-up email is shown only here, and masked until the user reveals it.
+  const [showEmail, setShowEmail] = useState(false);
 
   useEffect(() => setForm(fromProfile(user)), [user]);
 
@@ -40,22 +46,25 @@ export function ProfileEditor({ user }: { user: MeProfile }) {
     setForm((f) => ({ ...f, [key]: value }));
   }
 
-  function toggleNotif(channel: string) {
-    set(
-      "notifPrefs",
-      form.notifPrefs.includes(channel)
-        ? form.notifPrefs.filter((c) => c !== channel)
-        : [...form.notifPrefs, channel],
-    );
+  // Subdivisions of the selected country that carry an ISO code — the state picker's options.
+  // Changing country resets state so a stale "US-CA" can't survive a switch to another country.
+  const stateOptions = useMemo(() => {
+    const country = COUNTRIES.find((c) => c[1] === form.country);
+    return country ? country[2].filter((r) => r[1]) : [];
+  }, [form.country]);
+
+  function setCountry(code: string) {
+    setForm((f) => ({ ...f, country: code, state: "" }));
   }
 
   function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     const input: UpdateProfileInput = {
       bio: form.bio,
-      region: form.region,
-      demographicsPublic: form.demographicsPublic,
-      notifPrefs: form.notifPrefs,
+      country: form.country,
+      state: form.state,
+      // Demographics are never shown on the public profile (the opt-in toggle was removed).
+      demographicsPublic: false,
     };
     if (form.gender) input.gender = form.gender;
     mutation.mutate(input);
@@ -77,12 +86,33 @@ export function ProfileEditor({ user }: { user: MeProfile }) {
               Your public identity. Auto-assigned and not editable — we don’t show real names.
             </p>
           </div>
+          <div className="space-y-1.5">
+            <Label>Email</Label>
+            <div className="flex items-center gap-2">
+              <p className="flex-1 rounded-md border bg-muted/40 px-3 py-2 font-mono text-sm text-foreground">
+                {showEmail ? user.settings.email : maskEmail(user.settings.email)}
+              </p>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowEmail((v) => !v)}
+                aria-label={showEmail ? "Hide email" : "Show email"}
+              >
+                {showEmail ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                {showEmail ? "Hide" : "Show"}
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              The email you signed up with. Only ever shown here, to you.
+            </p>
+          </div>
           <Field label="Bio" htmlFor="bio">
             <Textarea
               id="bio"
               maxLength={280}
               rows={3}
-              placeholder="A line about you…"
+              placeholder="Share something about yourself — but keep it anonymous, no details that could identify you."
               value={form.bio}
               onChange={(e) => set("bio", e.target.value)}
             />
@@ -94,8 +124,7 @@ export function ProfileEditor({ user }: { user: MeProfile }) {
         <CardHeader>
           <CardTitle>Demographics</CardTitle>
           <p className="text-sm text-muted-foreground">
-            Powers poll analytics only when you enable demographic consent under Privacy &amp; consent
-            below. Hidden from your public profile unless you opt in here.
+            Powers anonymized, aggregate poll analytics. Never shown on your public profile.
           </p>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -110,14 +139,32 @@ export function ProfileEditor({ user }: { user: MeProfile }) {
                 ))}
               </Select>
             </Field>
-            <Field label="Region" htmlFor="region">
-              <Input
-                id="region"
-                maxLength={16}
-                placeholder="US-CA"
-                value={form.region}
-                onChange={(e) => set("region", e.target.value)}
-              />
+            <Field label="Country" htmlFor="country">
+              <Select id="country" value={form.country} onChange={(e) => setCountry(e.target.value)}>
+                <option value="">Prefer not to say</option>
+                {COUNTRIES.map((c) => (
+                  <option key={c[1]} value={c[1]}>
+                    {c[0]}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+            <Field label="State / Region" htmlFor="state">
+              <Select
+                id="state"
+                value={form.state}
+                onChange={(e) => set("state", e.target.value)}
+                disabled={stateOptions.length === 0}
+              >
+                <option value="">
+                  {form.country ? "Prefer not to say" : "Select a country first"}
+                </option>
+                {stateOptions.map((r) => (
+                  <option key={r[1]} value={`${form.country}-${r[1]}`}>
+                    {r[0]}
+                  </option>
+                ))}
+              </Select>
             </Field>
           </div>
           {user.demographics.age != null && (
@@ -126,27 +173,6 @@ export function ProfileEditor({ user }: { user: MeProfile }) {
               <span className="text-xs">— set from your date of birth at sign-up and not editable.</span>
             </p>
           )}
-          <Toggle
-            checked={form.demographicsPublic}
-            onChange={(v) => set("demographicsPublic", v)}
-            label="Show my demographics on my public profile"
-          />
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Notifications</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {NOTIF_CHANNELS.map((channel) => (
-            <Toggle
-              key={channel}
-              checked={form.notifPrefs.includes(channel)}
-              onChange={() => toggleNotif(channel)}
-              label={`${channel[0].toUpperCase()}${channel.slice(1)} notifications`}
-            />
-          ))}
         </CardContent>
       </Card>
 
@@ -159,13 +185,19 @@ export function ProfileEditor({ user }: { user: MeProfile }) {
   );
 }
 
+/** Mask an email for the default (hidden) state, e.g. "ka•••@•••" — never reveals the full address. */
+function maskEmail(email: string): string {
+  const [local = "", domain = ""] = email.split("@");
+  const head = local.slice(0, 2);
+  return `${head}${"•".repeat(Math.max(local.length - 2, 3))}@${"•".repeat(Math.max(domain.length, 3))}`;
+}
+
 function fromProfile(me: MeProfile): FormState {
   return {
     bio: me.bio ?? "",
     gender: me.demographics.gender ?? "",
-    region: me.demographics.region ?? "",
-    demographicsPublic: me.demographics.demographicsPublic,
-    notifPrefs: me.settings.notifPrefs ?? [],
+    country: me.demographics.country ?? "",
+    state: me.demographics.state ?? "",
   };
 }
 
@@ -183,27 +215,5 @@ function Field({
       <Label htmlFor={htmlFor}>{label}</Label>
       {children}
     </div>
-  );
-}
-
-function Toggle({
-  checked,
-  onChange,
-  label,
-}: {
-  checked: boolean;
-  onChange: (v: boolean) => void;
-  label: string;
-}) {
-  return (
-    <label className="flex cursor-pointer items-center gap-3 text-sm">
-      <input
-        type="checkbox"
-        checked={checked}
-        onChange={(e) => onChange(e.target.checked)}
-        className="h-4 w-4 rounded border-input accent-primary"
-      />
-      <span className="text-foreground">{label}</span>
-    </label>
   );
 }

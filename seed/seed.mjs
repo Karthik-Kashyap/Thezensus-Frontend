@@ -52,6 +52,8 @@ const chunk = (arr, n) => {
   for (let i = 0; i < arr.length; i += n) out.push(arr.slice(i, i + n));
   return out;
 };
+// "US-CA" (ISO-3166-2) → { country: "US", state: "US-CA" } for the demographics split (DESIGN-008).
+const splitLocation = (loc) => ({ country: loc.split("-")[0], state: loc });
 
 async function main() {
   const wipe = process.argv.includes("--wipe");
@@ -85,7 +87,7 @@ async function main() {
       birthDate: `${birthYear}-06-15`,
       ...(Math.random() > usersCfg.noBioFraction ? { bio: pick(usersCfg.bios) } : {}),
       gender: pick(usersCfg.genders),
-      region: pick(usersCfg.regions),
+      ...splitLocation(pick(usersCfg.locations)),
       birthYear,
       demographicsPublic: true,
       demographicsConsent: consent,

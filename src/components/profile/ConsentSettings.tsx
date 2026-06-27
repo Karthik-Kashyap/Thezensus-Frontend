@@ -43,7 +43,7 @@ export function ConsentSettings() {
           <>
             <ConsentRow
               label="Demographic analytics"
-              hint="Let your votes contribute to anonymized, aggregate breakdowns (e.g. by region/age)."
+              hint="Let your votes contribute to anonymized, aggregate breakdowns (e.g. by country/age)."
               checked={data.purposes.demographics}
               disabled={mutation.isPending}
               onChange={(v) => mutation.mutate({ demographics: v })}

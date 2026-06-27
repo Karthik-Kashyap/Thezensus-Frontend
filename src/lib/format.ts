@@ -60,14 +60,22 @@ export function formatCountdown(ms: number): string {
 
 /**
  * A raw edition label → a friendly, cadence-aware name for the history picker:
- *   DAILY   "2026-06-22" → "Jun 22, 2026"
- *   WEEKLY  "2026-W25"   → "Week 25, 2026"
- *   MONTHLY "2026-06"    → "June 2026"
- *   YEARLY  "2026"       → "2026"
- *   NONE/MANUAL "main"   → "Current"
+ *   DAILY    "2026-06-22"       → "Jun 22, 2026"
+ *   WEEKLY   "2026-W25"         → "Week 25, 2026"
+ *   MONTHLY  "2026-06"          → "June 2026"
+ *   YEARLY   "2026"             → "2026"
+ *   INTERVAL "2026-06-22T15:30" → "Jun 22, 2026, 3:30 PM"
+ *   NONE/MANUAL "main"          → "Current"
  * Falls back to the raw label if it doesn't match the expected shape.
  */
 export function formatEditionLabel(recurrence: Recurrence, label: string): string {
+  if (recurrence === "INTERVAL") {
+    // Labels are local wall-clock slot starts (`YYYY-MM-DDThh:mm`); parse as local time.
+    const d = new Date(label);
+    return Number.isNaN(d.getTime())
+      ? label
+      : d.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+  }
   if (recurrence === "DAILY") {
     const d = new Date(`${label}T00:00:00`);
     return Number.isNaN(d.getTime()) ? label : d.toLocaleDateString(undefined, { dateStyle: "medium" });
@@ -86,6 +94,17 @@ export function formatEditionLabel(recurrence: Recurrence, label: string): strin
   }
   if (recurrence === "YEARLY") return label;
   return label === "main" ? "Current" : label;
+}
+
+/** A poll's cadence as a short human phrase for the recurrence badge:
+ *  DAILY → "daily", INTERVAL+15 → "every 15 min", INTERVAL+120 → "every 2 hr". */
+export function cadenceLabel(recurrence: Recurrence, intervalMinutes?: number): string {
+  if (recurrence === "INTERVAL" && intervalMinutes) {
+    return intervalMinutes < 60
+      ? `every ${intervalMinutes} min`
+      : `every ${intervalMinutes / 60} hr`;
+  }
+  return recurrence.toLowerCase();
 }
 
 /** Vote count → "1.2k" style compaction. */

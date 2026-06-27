@@ -99,7 +99,11 @@ export default defineSchema({
   userDemographics: defineTable({
     linkId: v.string(),
     gender: v.optional(v.string()),
-    region: v.optional(v.string()), // coarse, e.g. US-CA
+    // Geo demographics (DESIGN-008 region split): two flat marginals. `country` = ISO-3166-1
+    // alpha-2 ("US"); `state` = ISO-3166-2 ("US-CA"). Both fold to separate `dimCounts` keys.
+    country: v.optional(v.string()),
+    state: v.optional(v.string()),
+    region: v.optional(v.string()), // DEPRECATED — backfilled to country/state; drop after migration (RUNBOOK)
     birthYear: v.optional(v.number()),
     demographicsPublic: v.boolean(),
     demographicsConsent: v.boolean(),
@@ -242,8 +246,12 @@ export default defineSchema({
       v.literal("WEEKLY"),
       v.literal("MONTHLY"),
       v.literal("YEARLY"),
+      v.literal("INTERVAL"), // fixed sub-daily / N-hour cadence; period length = intervalMinutes
       v.literal("MANUAL"),
     ),
+    /** Slot length in minutes for INTERVAL recurrence (one of INTERVAL_MINUTES_ALLOWED); absent
+     *  for every other cadence. Editions snap to clean clock marks anchored to local midnight. */
+    intervalMinutes: v.optional(v.number()),
     timezone: v.optional(v.string()),
     recurrenceStart: v.optional(v.string()),
     recurrenceEnd: v.optional(v.string()),
@@ -300,7 +308,9 @@ export default defineSchema({
       v.object({
         gender: v.optional(v.string()),
         ageAtVote: v.optional(v.number()),
-        region: v.optional(v.string()),
+        country: v.optional(v.string()), // ISO-3166-1 alpha-2, e.g. "US" (DESIGN-008 region split)
+        state: v.optional(v.string()), // ISO-3166-2, e.g. "US-CA"
+        region: v.optional(v.string()), // DEPRECATED — historical snapshots only; drop after migration
         segments: v.optional(v.record(v.string(), v.string())),
       }),
     ),

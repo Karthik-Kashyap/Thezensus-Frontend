@@ -21,5 +21,9 @@
     "noEmit": true
   },
   "include": ["./**/*"],
-  "exclude": ["./_generated"]
+  /* Test files are run/typechecked by vitest (see /vitest.config.ts), NOT by the Convex deploy
+   * typecheck — they import `vitest`, which isn't part of the Convex runtime. Convex already
+   * skips them when bundling (multi-dot filename rule), so excluding them here just keeps the
+   * `npx convex dev` typecheck from tripping over the test-only imports. */
+  "exclude": ["./_generated", "./**/*.test.ts", "./**/*.test.tsx"]
 }

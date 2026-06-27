@@ -38,7 +38,8 @@ export interface InsertVoteInput {
   demographics?: {
     gender?: string;
     ageAtVote?: number;
-    region?: string;
+    country?: string;
+    state?: string;
     segments?: Record<string, string>;
   };
 }

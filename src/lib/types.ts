@@ -5,7 +5,7 @@
 export type Visibility = "public" | "protected" | "private";
 export type PollType = "binary" | "multi";
 export type AudienceType = "COMMUNITY" | "LINK";
-export type Recurrence = "NONE" | "DAILY" | "WEEKLY" | "MONTHLY" | "YEARLY" | "MANUAL";
+export type Recurrence = "NONE" | "DAILY" | "WEEKLY" | "MONTHLY" | "YEARLY" | "INTERVAL" | "MANUAL";
 export type PollStatus = "ACTIVE" | "CLOSED" | "DELETED";
 export type WindowState = "PENDING" | "ACTIVE" | "ENDED";
 export type EditionStatus = "OPEN" | "CLOSED";
@@ -39,7 +39,8 @@ export interface MeProfile {
   demographics: {
     gender?: string;
     age?: number; // derived, read-only (own view only)
-    region?: string;
+    country?: string; // ISO-3166-1 alpha-2, e.g. "US"
+    state?: string; // ISO-3166-2, e.g. "US-CA"
     demographicsPublic: boolean;
     demographicsConsent: boolean;
   };
@@ -63,13 +64,14 @@ export interface PublicProfile {
   avatarKey?: string;
   createdAt: string;
   stats: ProfileStats;
-  demographics?: { gender?: string; region?: string };
+  demographics?: { gender?: string; country?: string; state?: string };
 }
 
 export interface UpdateProfileInput {
   bio?: string;
   gender?: string;
-  region?: string;
+  country?: string; // ISO-3166-1 alpha-2, e.g. "US"
+  state?: string; // ISO-3166-2, e.g. "US-CA"
   demographicsPublic?: boolean;
   notifPrefs?: string[];
   avatarMediaId?: string;
@@ -79,7 +81,9 @@ export interface UpdateProfileInput {
 /** POST /auth/signup/complete — age gate + baseline consent for a first-time identity (ADR-008/009). */
 export interface CompleteSignupInput {
   birthDate: string; // YYYY-MM-DD (full DOB; server enforces 13+)
-  consent: { demographics: boolean; marketingEmail: boolean };
+  // Optional; demographics defaults to granted server-side when omitted. Marketing email is not
+  // collected at signup yet (added with the email system).
+  consent?: { demographics?: boolean };
 }
 
 /** GET /users/me/consent — latest state per purpose + the policy version stamped on events. */
@@ -221,6 +225,8 @@ export interface Poll {
   ballotMode: BallotMode;
   requireLoginToVote: boolean;
   recurrence: Recurrence;
+  /** Slot length in minutes for INTERVAL recurrence; absent for every other cadence. */
+  intervalMinutes?: number;
   timezone?: string;
   recurrenceStart?: string;
   recurrenceEnd?: string;
@@ -266,6 +272,27 @@ export interface SliceResult {
   suppressedBelow: number;
 }
 
+/** The four flat demographic marginals a poll's results can be broken down by (never crossed). */
+export type DemographicDimension = "gender" | "age" | "country" | "state";
+
+/** One demographic value's breakdown from `api.slices.getDemographicBreakdown`: the value (raw
+ *  code — "US", "US-CA", "female", "25-34"; resolved to a label client-side) + its per-option
+ *  counts. */
+export interface DemographicRow {
+  value: string;
+  counts: Record<string, number>;
+  total: number;
+}
+
+/** The free, single-dimension demographic breakdown: the surviving (k≥5) value rows. */
+export interface DemographicBreakdownResult {
+  pollId: string;
+  edition: string;
+  dimension: DemographicDimension;
+  rows: DemographicRow[];
+  suppressedBelow: number;
+}
+
 /**
  * Feed item — the compact poll plus the live current-edition scoreboard (so feed cards vote +
  * render results in place) and a count of visible comments. `commentCountCapped` true → the count
@@ -285,6 +312,7 @@ export interface PollListItem {
   visibility?: Visibility;
   ballotMode: BallotMode;
   recurrence: Recurrence;
+  intervalMinutes?: number;
   recurrenceStart?: string;
   recurrenceEnd?: string;
   status: PollStatus;
@@ -324,6 +352,8 @@ export interface CreatePollInput {
   ballotMode?: BallotMode;
   requireLoginToVote?: boolean;
   recurrence?: Recurrence;
+  /** Required when recurrence is INTERVAL: the slot length (one of the allowed lengths). */
+  intervalMinutes?: number;
   timezone?: string;
   recurrenceStart?: string;
   recurrenceEnd?: string;

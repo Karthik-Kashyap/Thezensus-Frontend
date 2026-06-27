@@ -1,7 +1,7 @@
 // Users-domain pure logic: age derivation and the DTO composition that the old
 // auth-service userProfile.logic did — composing PII-free docs with the vault (email +
 // DOB-derived age, own-view only) and enforcing visibility: settings/email/age never
-// leave the server for other users; gender/region show only when demographicsPublic.
+// leave the server for other users; gender/country/state show only when demographicsPublic.
 // DTO shapes mirror src/lib/types.ts (MeProfile / PublicProfile) exactly.
 
 import type { Doc } from "../_generated/dataModel";
@@ -49,7 +49,8 @@ export function toMe(
     stats: toStats(user.stats),
     demographics: {
       gender: demographics?.gender,
-      region: demographics?.region,
+      country: demographics?.country,
+      state: demographics?.state,
       age,
       demographicsPublic: demographics?.demographicsPublic ?? false,
       demographicsConsent: demographics?.demographicsConsent ?? false,
@@ -81,7 +82,7 @@ export function toPublic(linkId: string, user: UserAggregate) {
     createdAt: profile ? new Date(profile._creationTime).toISOString() : "",
     stats: toStats(user.stats),
     ...(demographics?.demographicsPublic
-      ? { demographics: { gender: demographics.gender, region: demographics.region } }
+      ? { demographics: { gender: demographics.gender, country: demographics.country, state: demographics.state } }
       : {}),
   };
 }

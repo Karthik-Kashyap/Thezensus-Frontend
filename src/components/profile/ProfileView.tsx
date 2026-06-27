@@ -17,11 +17,6 @@ import { PageContainer } from "@/components/layout/PageContainer";
 export function ProfileView({ profile }: { profile: PublicProfile }) {
   const { user } = useSession();
   const isSelf = user?.linkId === profile.linkId;
-  const demo = profile.demographics;
-  const demoLine =
-    demo && (demo.gender || demo.region)
-      ? [demo.gender?.replace(/_/g, " "), demo.region].filter(Boolean).join(" · ")
-      : null;
 
   return (
     <PageContainer className="space-y-6">
@@ -56,7 +51,6 @@ export function ProfileView({ profile }: { profile: PublicProfile }) {
           <div className="flex gap-6 border-t pt-4">
             <Stat label="Polls" value={profile.stats.pollsCreated} />
             <Stat label="Votes received" value={profile.stats.totalVotesReceived} />
-            {demoLine && <div className="text-sm text-muted-foreground">{demoLine}</div>}
           </div>
         </CardContent>
       </Card>

@@ -38,7 +38,9 @@ export const createAccount = mutation({
     email: v.string(),
     legalName: v.optional(v.string()), // PII-vault only; never the public identity
     birthDate: v.string(), // YYYY-MM-DD; 13+ enforced in logic (ADR-008)
-    consent: v.object({ demographics: v.boolean(), marketingEmail: v.boolean() }),
+    // Optional: demographics defaults to granted server-side when omitted. Marketing email
+    // isn't collected at signup yet (added with the email system).
+    consent: v.optional(v.object({ demographics: v.optional(v.boolean()) })),
   },
   handler: async (ctx, { secret, ...input }) => {
     requireBridgeSecret(secret);

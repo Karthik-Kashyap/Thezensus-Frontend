@@ -1,20 +1,25 @@
-// Slices API — the paywalled cross-tab read surface (DESIGN-008 §D). ONE query: getSlice
-// combines the viewer's chosen community SEGMENTS into a joint breakdown, computed
-// server-side from the single cross-tab doc. The paywall is enforced HERE, before any
-// heavy work: a free account that asks for more dimensions than its tier allows gets a 403
-// and zero cells — the full table never leaves the backend (that's the whole point; if the
-// data reached the browser the paywall would be trivially bypassable).
+// Slices API — the "break down results" read surface (DESIGN-008 §D). Two queries, two
+// distinct rails by design:
 //
-// Scope: SEGMENT cross-tab slicing only. Demographic marginals (age/region/gender) live in
-// editionResults.dimCounts and are a separate, free, single-dimension read — out of scope.
+//   • getSlice — the PAYWALLED community-SEGMENT cross-tab. Combines the viewer's chosen
+//     segments into a joint breakdown computed server-side from the single cross-tab doc.
+//     The tier paywall is enforced HERE, before any heavy work: a free account that asks
+//     for more dimensions than its tier allows gets a 403 and zero cells — the full table
+//     never leaves the backend (that's the whole point; if the data reached the browser the
+//     paywall would be trivially bypassable).
+//
+//   • getDemographicBreakdown — a FREE, anonymous-friendly, SINGLE demographic dimension
+//     (age/country/state/gender) read straight off editionResults.dimCounts. These are flat
+//     MARGINALS that never cross each other, so there's no paywall and no joint math — just
+//     a k-anonymity suppress over one dimension's values.
 //
 // I/O only (style matches votes.ts): validate args, resolve actor/tier/poll, call the pure
-// helpers in lib/slicing.logic.ts + lib/slices.logic.ts, return the DTO.
+// helpers in lib/slicing.logic.ts + lib/slices.logic.ts + lib/demographics.logic.ts, return the DTO.
 
 import { v } from "convex/values";
 import { query } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
-import { requireActor } from "./lib/actor";
+import { optionalActor, requireActor } from "./lib/actor";
 import { badRequest, forbidden, notFound } from "./lib/errors";
 import { ballotKey } from "./lib/constants/poll";
 import { MIN_CELL_VOTERS } from "./lib/constants/slicing";
@@ -32,6 +37,7 @@ import {
   resolveSelectedSegments,
   buildSliceCells,
 } from "./lib/slices.logic";
+import { buildDemographicBreakdown } from "./lib/demographics.logic";
 
 /**
  * GET a paywalled cross-tab slice. `dims` = the community SEGMENT IDs to combine. The tier
@@ -103,6 +109,52 @@ export const getSlice = query({
       edition: label,
       dims: dimsDto,
       cells,
+      suppressedBelow: MIN_CELL_VOTERS,
+    };
+  },
+});
+
+/**
+ * GET one demographic dimension's marginal breakdown (gender | age | country | state). FREE and
+ * anonymous-friendly — unlike getSlice's paywalled cross-tab, this is k-anonymized PUBLIC
+ * aggregate, read straight off editionResults.dimCounts with NO crossing and no tier gate. The
+ * data is already folded per edition by the tally; this only filters to the requested dimension,
+ * suppresses below-floor groups, and orders the rows.
+ *
+ * Returns null when the poll is missing / not visible (mirrors polls.get so the live subscriber
+ * renders the not-found state without an error boundary); an empty `rows` when nothing's been
+ * tallied yet or every value sits below the suppression floor.
+ */
+export const getDemographicBreakdown = query({
+  args: {
+    pollId: v.string(),
+    dimension: v.union(
+      v.literal("gender"),
+      v.literal("age"),
+      v.literal("country"),
+      v.literal("state"),
+    ),
+    token: v.optional(v.string()),
+    edition: v.optional(v.string()),
+  },
+  handler: async (ctx, { pollId, dimension, token, edition }) => {
+    const actor = await optionalActor(ctx);
+
+    // View access only — same gate as the poll read queries (existence never leaked for LINK polls).
+    const poll = await getPoll(ctx, pollId);
+    if (!poll || isHidden(poll) || !(await canViewPoll(ctx, poll, actor?.linkId ?? null, token))) {
+      return null;
+    }
+
+    const label = edition ?? currentEditionLabel(poll);
+    const results = await getResults(ctx, ballotKey(poll.pollId, label));
+    const rows = buildDemographicBreakdown(results?.dimCounts, dimension, MIN_CELL_VOTERS);
+
+    return {
+      pollId: poll.pollId,
+      edition: label,
+      dimension,
+      rows,
       suppressedBelow: MIN_CELL_VOTERS,
     };
   },

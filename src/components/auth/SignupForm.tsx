@@ -45,8 +45,6 @@ export function SignupForm({ returnTo }: { returnTo?: string }) {
   const [birthDay, setBirthDay] = useState("");
   const [birthMonth, setBirthMonth] = useState("");
   const [birthYear, setBirthYear] = useState("");
-  const [demographics, setDemographics] = useState(false);
-  const [marketingEmail, setMarketingEmail] = useState(false);
   const [rejection, setRejection] = useState<Rejection>(null);
 
   const mutation = useMutation({
@@ -68,10 +66,8 @@ export function SignupForm({ returnTo }: { returnTo?: string }) {
     e.preventDefault();
     const birthDate = toBirthDate(birthDay, birthMonth, birthYear);
     if (!birthDate) return toast.error("Please enter a valid date of birth.");
-    mutation.mutate({
-      birthDate,
-      consent: { demographics, marketingEmail },
-    });
+    // No consent collected at signup — demographics defaults to granted server-side.
+    mutation.mutate({ birthDate });
   }
 
   if (rejection === "under_age") {
@@ -154,22 +150,6 @@ export function SignupForm({ returnTo }: { returnTo?: string }) {
             </p>
           </div>
 
-          <fieldset className="space-y-3 rounded-lg border p-4">
-            <legend className="px-1 text-sm font-medium">Your choices</legend>
-            <Consent
-              checked={demographics}
-              onChange={setDemographics}
-              label="Use my demographics in poll analytics"
-              hint="Lets your votes contribute to aggregate, anonymized breakdowns (e.g. by region). You can change this anytime."
-            />
-            <Consent
-              checked={marketingEmail}
-              onChange={setMarketingEmail}
-              label="Send me occasional product emails"
-              hint="News and updates. No spam — unsubscribe anytime."
-            />
-          </fieldset>
-
           <Button type="submit" size="lg" className="w-full" disabled={mutation.isPending}>
             {mutation.isPending ? "Creating your account…" : "Create account"}
           </Button>
@@ -179,33 +159,6 @@ export function SignupForm({ returnTo }: { returnTo?: string }) {
         </form>
       </CardContent>
     </Card>
-  );
-}
-
-function Consent({
-  checked,
-  onChange,
-  label,
-  hint,
-}: {
-  checked: boolean;
-  onChange: (v: boolean) => void;
-  label: string;
-  hint: string;
-}) {
-  return (
-    <label className="flex cursor-pointer gap-3 text-sm">
-      <input
-        type="checkbox"
-        checked={checked}
-        onChange={(e) => onChange(e.target.checked)}
-        className="mt-0.5 h-4 w-4 rounded border-input accent-primary"
-      />
-      <span>
-        <span className="block font-medium text-foreground">{label}</span>
-        <span className="block text-xs text-muted-foreground">{hint}</span>
-      </span>
-    </label>
   );
 }
 

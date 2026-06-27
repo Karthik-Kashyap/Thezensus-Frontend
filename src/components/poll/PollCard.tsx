@@ -10,7 +10,7 @@ import { getCommunity } from "@/lib/communities";
 import { useLiveSlot } from "@/components/feed/LiveSlotProvider";
 import { useSession } from "@/lib/session";
 import { routes } from "@/lib/constants";
-import { relativeTime, compactNumber } from "@/lib/format";
+import { relativeTime, compactNumber, cadenceLabel } from "@/lib/format";
 import { ANONYMOUS_HINT, recurrenceHint } from "@/lib/pollHints";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -69,7 +69,19 @@ export function PollCard({
 
   return (
     <Card ref={liveRef} className="animate-fade-up p-5 transition hover:border-primary/40 hover:shadow-md">
-      <div className="mb-3 flex items-center gap-2 text-xs text-muted-foreground">
+      <Link href={routes.poll(poll.pollId)} className="group block">
+        <h3 className="font-display text-lg font-semibold leading-snug tracking-tight transition group-hover:text-primary">
+          {poll.question}
+        </h3>
+      </Link>
+      <Link
+        href={routes.profile(poll.creatorId)}
+        className="mt-1 inline-block text-xs text-muted-foreground transition hover:text-foreground"
+      >
+        by {poll.creatorHandle ?? poll.creatorId.slice(0, 8)}
+      </Link>
+
+      <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
         {poll.communityId ? (
           <Link
             href={routes.community(poll.communityId)}
@@ -84,7 +96,7 @@ export function PollCard({
         {poll.recurrence !== "NONE" && (
           <InfoHint content={recurrenceHint(poll.recurrence, poll.recurrenceStart, poll.recurrenceEnd)}>
             <span className="inline-flex items-center gap-1 capitalize">
-              <Repeat className="h-3 w-3" /> {poll.recurrence.toLowerCase()}
+              <Repeat className="h-3 w-3" /> {cadenceLabel(poll.recurrence, poll.intervalMinutes)}
             </span>
           </InfoHint>
         )}
@@ -99,7 +111,7 @@ export function PollCard({
             </Badge>
           </InfoHint>
         )}
-        <span className="ml-auto inline-flex items-center gap-2">
+        <span className="ml-auto inline-flex items-center gap-2 text-sm font-medium">
           <VoteCount count={livePoll.currentEdition.voteCount} />
           <span aria-hidden className="opacity-50">·</span>
           <span>{relativeTime(poll.createdAt)}</span>
@@ -112,18 +124,6 @@ export function PollCard({
           />
         )}
       </div>
-
-      <Link href={routes.poll(poll.pollId)} className="group block">
-        <h3 className="font-display text-lg font-semibold leading-snug tracking-tight transition group-hover:text-primary">
-          {poll.question}
-        </h3>
-      </Link>
-      <Link
-        href={routes.profile(poll.creatorId)}
-        className="mt-1 inline-block text-xs text-muted-foreground transition hover:text-foreground"
-      >
-        by {poll.creatorHandle ?? poll.creatorId.slice(0, 8)}
-      </Link>
 
       <PollImage
         mediaId={poll.questionMediaId}

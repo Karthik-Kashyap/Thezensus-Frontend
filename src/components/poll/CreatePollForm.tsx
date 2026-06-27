@@ -3,12 +3,15 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery as useConvexQuery } from "convex/react";
 import { toast } from "sonner";
-import { Plus, X, Link2, Users, BarChart3, EyeOff } from "lucide-react";
+import { Plus, X, Link2, Users, ImagePlus, CalendarClock } from "lucide-react";
+import { api } from "../../../convex/_generated/api";
 import { createPoll } from "@/lib/polls";
 import { listMySubscriptions, getCommunity } from "@/lib/communities";
 import { routes } from "@/lib/constants";
-import type { AudienceType, BallotMode, CreatePollInput, PollType, Recurrence } from "@/lib/types";
+import { formatEditionLabel } from "@/lib/format";
+import type { AudienceType, CreatePollInput, PollType, Recurrence } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -23,20 +26,48 @@ let optionSeq = 0;
 type OptionRow = { key: string; label: string; image?: PollImageValue | null };
 const newOption = (): OptionRow => ({ key: `o${optionSeq++}`, label: "" });
 
-// Mirror the backend POLL_LIMITS (tagsMax / tagMax) — the create mutation re-validates.
-const MAX_TAGS = 10;
-const MAX_TAG_LEN = 40;
+// Poll image upload (question + per-option) is temporarily disabled for users while media
+// moderation is finished out (DESIGN-007 Phase B1). The full upload pipeline stays wired —
+// flip this to `true` to restore the image pickers. See PollImageInput.
+const POLL_IMAGES_ENABLED = false;
 
-// Recurrence cadences offered at creation. MANUAL (roll-editions-on-demand) is intentionally
-// excluded this phase — it needs a backend "roll" endpoint that doesn't exist yet. The four
-// time-based modes are fully automatic (compute-don't-roll: the edition is a pure function of
-// the clock + timezone), so they need no scheduler.
-const RECURRENCE_OPTIONS: { value: Recurrence; label: string }[] = [
-  { value: "NONE", label: "One-time" },
-  { value: "DAILY", label: "Daily" },
-  { value: "WEEKLY", label: "Weekly" },
-  { value: "MONTHLY", label: "Monthly" },
-  { value: "YEARLY", label: "Yearly" },
+// Recurrence cadences offered at creation, grouped for scannability. MANUAL (roll-on-demand) is
+// intentionally excluded this phase — it needs a backend "roll" endpoint that doesn't exist yet.
+// Every mode here is fully automatic (compute-don't-roll: the edition is a pure function of the
+// clock + timezone), so none needs a scheduler. INTERVAL options carry an `intervalMinutes` slot
+// length (must match the backend's INTERVAL_MINUTES_ALLOWED); the rest are calendar cadences.
+interface CadenceOption {
+  key: string; // unique selection id (a recurrence may appear with several intervals)
+  label: string;
+  recurrence: Recurrence;
+  intervalMinutes?: number;
+}
+const CADENCE_GROUPS: { heading?: string; options: CadenceOption[] }[] = [
+  { options: [{ key: "NONE", label: "One-time", recurrence: "NONE" }] },
+  {
+    heading: "Live",
+    options: [
+      { key: "INT-10", label: "10 min", recurrence: "INTERVAL", intervalMinutes: 10 },
+      { key: "INT-12", label: "12 min", recurrence: "INTERVAL", intervalMinutes: 12 },
+      { key: "INT-15", label: "15 min", recurrence: "INTERVAL", intervalMinutes: 15 },
+      { key: "INT-30", label: "30 min", recurrence: "INTERVAL", intervalMinutes: 30 },
+      { key: "INT-60", label: "1 hour", recurrence: "INTERVAL", intervalMinutes: 60 },
+      { key: "INT-120", label: "2 hours", recurrence: "INTERVAL", intervalMinutes: 120 },
+      { key: "INT-180", label: "3 hours", recurrence: "INTERVAL", intervalMinutes: 180 },
+      { key: "INT-240", label: "4 hours", recurrence: "INTERVAL", intervalMinutes: 240 },
+      { key: "INT-480", label: "8 hours", recurrence: "INTERVAL", intervalMinutes: 480 },
+      { key: "INT-720", label: "12 hours", recurrence: "INTERVAL", intervalMinutes: 720 },
+    ],
+  },
+  {
+    heading: "Live - Calendar",
+    options: [
+      { key: "DAILY", label: "Daily", recurrence: "DAILY" },
+      { key: "WEEKLY", label: "Weekly", recurrence: "WEEKLY" },
+      { key: "MONTHLY", label: "Monthly", recurrence: "MONTHLY" },
+      { key: "YEARLY", label: "Yearly", recurrence: "YEARLY" },
+    ],
+  },
 ];
 
 // A short curated list of common IANA zones; the viewer's detected zone is prepended (and is
@@ -76,35 +107,34 @@ export function CreatePollForm({ initialCommunityId }: { initialCommunityId?: st
   const [audience, setAudience] = useState<AudienceType>(initialCommunityId ? "COMMUNITY" : "COMMUNITY");
   const [communityId, setCommunityId] = useState(initialCommunityId ?? "");
   const [question, setQuestion] = useState("");
-  const [type, setType] = useState<PollType>("binary");
-  const [ballotMode, setBallotMode] = useState<BallotMode>("standard");
   // Recurrence cadence + the IANA timezone that decides when each edition rolls over. The
   // timezone select is hidden until a recurring cadence is picked, so seeding it from the
   // server zone during SSR can't cause a hydration mismatch.
   const [recurrence, setRecurrence] = useState<Recurrence>("NONE");
+  // Set only for INTERVAL recurrence (the slot length); cleared whenever a non-interval chip is picked.
+  const [intervalMinutes, setIntervalMinutes] = useState<number | undefined>(undefined);
   const [timezone, setTimezone] = useState<string>(detectTimezone);
-  // Default poll type is Yes / No, so the options start pre-filled to match.
+  // Options start pre-filled with Yes / No; creators can edit them or add more via "Add option".
+  // The poll type is derived from the final option count at submit (exactly 2 → binary, more → multi),
+  // so there's no type toggle to click.
   const [options, setOptions] = useState<OptionRow[]>([
     { key: "o-yes", label: "Yes" },
     { key: "o-no", label: "No" },
   ]);
-  // Remembers each ballot type's options while the other type is active, so
-  // toggling between Yes / No and multiple choice restores whatever was typed.
-  const [stashedMulti, setStashedMulti] = useState<OptionRow[] | null>(null);
-  const [stashedBinary, setStashedBinary] = useState<OptionRow[] | null>(null);
   // Optional question image (poll_question). Each option carries its own image on the row above.
   const [questionImage, setQuestionImage] = useState<PollImageValue | null>(null);
-  // Topics — normalized to bare lowercase tokens (the "#nba" model) so they group + filter
-  // cleanly on Discover. Deduped, capped at MAX_TAGS.
-  const [tags, setTags] = useState<string[]>([]);
-  const [tagDraft, setTagDraft] = useState("");
-  // Reveal the live result breakdown on the social share card (OG image). Defaults to true —
-  // the breakdown is the viral hook; creators can keep it hidden ("vote to see") instead.
-  const [showResults, setShowResults] = useState(true);
   // How many image pickers are mid-upload/scan. Blocks Publish until they clear, so a
   // still-scanning image can't be silently dropped from the submitted poll (DESIGN-007).
   const [uploadingImages, setUploadingImages] = useState(0);
   const onImageBusyChange = (busy: boolean) => setUploadingImages((n) => n + (busy ? 1 : -1));
+
+  // Live schedule preview for recurring polls — "60 editions, ends …". Computed server-side by the
+  // SAME cap math the create path stamps (api.polls.previewSchedule), so the form never duplicates
+  // the timezone-aware date arithmetic. Skipped (no query) for one-off polls.
+  const schedulePreview = useConvexQuery(
+    api.polls.previewSchedule,
+    recurrence === "NONE" ? "skip" : { recurrence, intervalMinutes, timezone },
+  ) as { maxEditions: number; endLabel: string } | null | undefined;
 
   // Communities the user can post to (their subscriptions).
   const { data: subs } = useQuery({ queryKey: ["subscriptions"], queryFn: listMySubscriptions });
@@ -122,51 +152,12 @@ export function CreatePollForm({ initialCommunityId }: { initialCommunityId?: st
     },
   });
 
-  function setType_(next: PollType) {
-    if (next === type) return;
-    setType(next);
-    if (next === "binary") {
-      // Stash the multiple-choice options, restore any earlier Yes / No edits,
-      // otherwise pre-fill with Yes / No.
-      setStashedMulti(options);
-      setOptions(
-        stashedBinary ?? [
-          { key: "o-yes", label: "Yes" },
-          { key: "o-no", label: "No" },
-        ],
-      );
-      setStashedBinary(null);
-    } else {
-      // Stash the Yes / No options, restore earlier multiple-choice options,
-      // otherwise start fresh with two blanks.
-      setStashedBinary(options);
-      setOptions(stashedMulti ?? [newOption(), newOption()]);
-      setStashedMulti(null);
-    }
-  }
-
   function updateOption(key: string, label: string) {
     setOptions((os) => os.map((o) => (o.key === key ? { ...o, label } : o)));
   }
 
   function setOptionImage(key: string, image: PollImageValue | null) {
     setOptions((os) => os.map((o) => (o.key === key ? { ...o, image } : o)));
-  }
-
-  function addTag(raw: string) {
-    const t = raw.trim().replace(/^#+/, "").toLowerCase().slice(0, MAX_TAG_LEN);
-    if (!t) return;
-    setTags((prev) => (prev.includes(t) || prev.length >= MAX_TAGS ? prev : [...prev, t]));
-    setTagDraft("");
-  }
-
-  function onTagKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
-    if (e.key === "Enter" || e.key === ",") {
-      e.preventDefault();
-      addTag(tagDraft);
-    } else if (e.key === "Backspace" && !tagDraft && tags.length) {
-      setTags((prev) => prev.slice(0, -1));
-    }
   }
 
   function onSubmit(e: React.FormEvent) {
@@ -178,14 +169,20 @@ export function CreatePollForm({ initialCommunityId }: { initialCommunityId?: st
     const isRecurring = recurrence !== "NONE";
     if (isRecurring && !timezone) return toast.error("Pick a timezone for the recurring schedule.");
 
+    // Exactly two options is a binary (Yes / No-style) poll; anything more is multiple choice.
+    const type: PollType = trimmed.length === 2 ? "binary" : "multi";
+
     mutation.mutate({
       audienceType: audience,
       communityId: audience === "COMMUNITY" ? communityId : undefined,
       question: question.trim(),
       questionMediaId: questionImage?.mediaId,
       type,
-      ballotMode,
+      // Ballot privacy + share-card + topics pickers are removed from the form; default to
+      // standard ballots and a results-revealing share card, with no topics.
+      ballotMode: "standard",
       recurrence: isRecurring ? recurrence : undefined,
+      intervalMinutes: isRecurring && recurrence === "INTERVAL" ? intervalMinutes : undefined,
       timezone: isRecurring ? timezone : undefined,
       options: options
         .filter((o) => o.label.trim())
@@ -194,17 +191,16 @@ export function CreatePollForm({ initialCommunityId }: { initialCommunityId?: st
           label: o.label.trim(),
           ...(o.image ? { mediaId: o.image.mediaId } : {}),
         })),
-      tags: tags.length ? tags : undefined,
-      shareCardShowResults: showResults,
+      shareCardShowResults: true,
     });
   }
 
-  const canRemove = type === "multi" && options.length > 2;
+  const canRemove = options.length > 2;
   // Detected/selected zone first, then the common list (deduped).
   const timezoneOptions = Array.from(new Set([timezone, ...COMMON_TIMEZONES]));
 
-  // Progress rail state. Destination + question are required; ballot privacy always has a
-  // value (defaults to standard), so it reads as satisfied from the start.
+  // Progress rail state. Destination + question are the only steps now that ballot privacy /
+  // share-card / topics have been removed from the form.
   const destinationDone = audience === "LINK" || (audience === "COMMUNITY" && Boolean(communityId));
   const filledOptions = options.filter((o) => o.label.trim()).length;
   const steps: Step[] = [
@@ -219,12 +215,6 @@ export function CreatePollForm({ initialCommunityId }: { initialCommunityId?: st
       label: "Your question",
       description: "Question & options",
       status: question.trim() && filledOptions >= 2 ? "complete" : "incomplete",
-    },
-    {
-      id: "privacy",
-      label: "Ballot privacy",
-      description: "Standard or anonymous",
-      status: "complete",
     },
   ];
 
@@ -297,24 +287,26 @@ export function CreatePollForm({ initialCommunityId }: { initialCommunityId?: st
               className="font-display text-lg"
             />
 
-            <div className="space-y-1.5">
-              <Label className="text-xs font-normal text-muted-foreground">
-                Question image (optional)
-              </Label>
-              <PollImageInput
-                kind="poll_question"
-                value={questionImage}
-                onChange={setQuestionImage}
-                onBusyChange={onImageBusyChange}
-                label="question image"
-                className="h-32 w-full max-w-sm"
-              />
-            </div>
-
-            <div className="flex gap-2">
-              <TypeChip active={type === "binary"} onClick={() => setType_("binary")} label="Yes / No" />
-              <TypeChip active={type === "multi"} onClick={() => setType_("multi")} label="Multiple choice" />
-            </div>
+            {POLL_IMAGES_ENABLED ? (
+              <div className="space-y-1.5">
+                <Label className="text-xs font-normal text-muted-foreground">
+                  Question image (optional)
+                </Label>
+                <PollImageInput
+                  kind="poll_question"
+                  value={questionImage}
+                  onChange={setQuestionImage}
+                  onBusyChange={onImageBusyChange}
+                  label="question image"
+                  className="h-32 w-full max-w-sm"
+                />
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 rounded-lg border border-dashed px-3 py-2 text-sm text-muted-foreground">
+                <ImagePlus className="h-4 w-4" />
+                Images coming soon
+              </div>
+            )}
 
             <div className="space-y-2">
               {options.map((o, i) => (
@@ -328,14 +320,16 @@ export function CreatePollForm({ initialCommunityId }: { initialCommunityId?: st
                     maxLength={120}
                     onChange={(e) => updateOption(o.key, e.target.value)}
                   />
-                  <PollImageInput
-                    kind="poll_option"
-                    value={o.image ?? null}
-                    onChange={(v) => setOptionImage(o.key, v)}
-                    onBusyChange={onImageBusyChange}
-                    label={`image for option ${i + 1}`}
-                    className="h-10 w-10 shrink-0"
-                  />
+                  {POLL_IMAGES_ENABLED && (
+                    <PollImageInput
+                      kind="poll_option"
+                      value={o.image ?? null}
+                      onChange={(v) => setOptionImage(o.key, v)}
+                      onBusyChange={onImageBusyChange}
+                      label={`image for option ${i + 1}`}
+                      className="h-10 w-10 shrink-0"
+                    />
+                  )}
                   {canRemove && (
                     <Button
                       type="button"
@@ -348,82 +342,14 @@ export function CreatePollForm({ initialCommunityId }: { initialCommunityId?: st
                   )}
                 </div>
               ))}
-              {type === "multi" && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setOptions((os) => [...os, newOption()])}
-                >
-                  <Plus className="h-4 w-4" /> Add option
-                </Button>
-              )}
-            </div>
-
-            <div className="space-y-1.5">
-              <Label htmlFor="tags">
-                Topics <span className="font-normal text-muted-foreground">(optional)</span>
-              </Label>
-              <p className="text-xs text-muted-foreground">
-                Add up to {MAX_TAGS} so people can find this on Discover. Press Enter or comma.
-              </p>
-              <div className="flex flex-wrap items-center gap-2 rounded-lg border bg-background p-2 focus-within:border-primary/60">
-                {tags.map((t) => (
-                  <span
-                    key={t}
-                    className="inline-flex items-center gap-1 rounded-full bg-accent px-2.5 py-0.5 text-sm font-medium"
-                  >
-                    #{t}
-                    <button
-                      type="button"
-                      onClick={() => setTags((prev) => prev.filter((x) => x !== t))}
-                      className="text-muted-foreground hover:text-foreground"
-                      aria-label={`Remove ${t}`}
-                    >
-                      <X className="h-3.5 w-3.5" />
-                    </button>
-                  </span>
-                ))}
-                {tags.length < MAX_TAGS && (
-                  <input
-                    id="tags"
-                    value={tagDraft}
-                    maxLength={MAX_TAG_LEN}
-                    onChange={(e) => setTagDraft(e.target.value)}
-                    onKeyDown={onTagKeyDown}
-                    onBlur={() => addTag(tagDraft)}
-                    placeholder={tags.length ? "Add another…" : "e.g. sports, nba, seattle"}
-                    className="min-w-[8rem] flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
-                  />
-                )}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Ballot privacy</CardTitle>
-            <p className="text-sm text-muted-foreground">
-              This can’t be changed after you publish.
-            </p>
-          </CardHeader>
-          <CardContent>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <AudienceCard
-                active={ballotMode === "standard"}
-                onClick={() => setBallotMode("standard")}
-                icon={BarChart3}
-                title="Standard"
-                hint="Attributable votes — powers demographic analytics."
-              />
-              <AudienceCard
-                active={ballotMode === "anonymous"}
-                onClick={() => setBallotMode("anonymous")}
-                icon={EyeOff}
-                title="Anonymous"
-                hint="Unlinkable votes — no analytics, and votes can’t be changed."
-              />
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => setOptions((os) => [...os, newOption()])}
+              >
+                <Plus className="h-4 w-4" /> Add option
+              </Button>
             </div>
           </CardContent>
         </Card>
@@ -432,19 +358,33 @@ export function CreatePollForm({ initialCommunityId }: { initialCommunityId?: st
           <CardHeader>
             <CardTitle>How often?</CardTitle>
             <p className="text-sm text-muted-foreground">
-              A recurring poll resets into a fresh edition each period — every edition keeps its
-              own separate results.
+              A recurring poll resets into a fresh edition each period — every edition keeps its own
+              separate results. Recurring polls automatically end after 60 editions.
             </p>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="flex flex-wrap gap-2">
-              {RECURRENCE_OPTIONS.map((r) => (
-                <TypeChip
-                  key={r.value}
-                  active={recurrence === r.value}
-                  onClick={() => setRecurrence(r.value)}
-                  label={r.label}
-                />
+            <div className="space-y-3">
+              {CADENCE_GROUPS.map((group, gi) => (
+                <div key={group.heading ?? `g-${gi}`} className="space-y-1.5">
+                  {group.heading && (
+                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                      {group.heading}
+                    </p>
+                  )}
+                  <div className="flex flex-wrap gap-2">
+                    {group.options.map((opt) => (
+                      <TypeChip
+                        key={opt.key}
+                        active={recurrence === opt.recurrence && intervalMinutes === opt.intervalMinutes}
+                        onClick={() => {
+                          setRecurrence(opt.recurrence);
+                          setIntervalMinutes(opt.intervalMinutes);
+                        }}
+                        label={opt.label}
+                      />
+                    ))}
+                  </div>
+                </div>
               ))}
             </div>
 
@@ -452,7 +392,7 @@ export function CreatePollForm({ initialCommunityId }: { initialCommunityId?: st
               <div className="space-y-1.5">
                 <Label htmlFor="timezone">Timezone</Label>
                 <p className="text-xs text-muted-foreground">
-                  Decides when each {recurrence.toLowerCase()} edition rolls over.
+                  Decides the clock each edition rolls over on.
                 </p>
                 <Select
                   id="timezone"
@@ -466,35 +406,21 @@ export function CreatePollForm({ initialCommunityId }: { initialCommunityId?: st
                     </option>
                   ))}
                 </Select>
+
+                {schedulePreview && (
+                  <p className="flex items-center gap-1.5 pt-1 text-xs text-muted-foreground">
+                    <CalendarClock className="h-3.5 w-3.5 shrink-0" />
+                    <span>
+                      Runs {schedulePreview.maxEditions} editions — ends around{" "}
+                      <span className="font-medium text-foreground">
+                        {formatEditionLabel(recurrence, schedulePreview.endLabel)}
+                      </span>
+                      .
+                    </span>
+                  </p>
+                )}
               </div>
             )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>When shared</CardTitle>
-            <p className="text-sm text-muted-foreground">
-              How the preview card looks when this poll is shared on social.
-            </p>
-          </CardHeader>
-          <CardContent>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <AudienceCard
-                active={showResults}
-                onClick={() => setShowResults(true)}
-                icon={BarChart3}
-                title="Reveal results"
-                hint="The share card shows the live vote breakdown."
-              />
-              <AudienceCard
-                active={!showResults}
-                onClick={() => setShowResults(false)}
-                icon={EyeOff}
-                title="Keep hidden"
-                hint="The card shows just the question — vote to see results."
-              />
-            </div>
           </CardContent>
         </Card>
 

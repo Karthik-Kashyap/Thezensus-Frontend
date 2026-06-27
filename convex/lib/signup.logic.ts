@@ -19,10 +19,14 @@ import { insertUserItems } from "./users.model";
 import { appendConsent } from "./consent.model";
 import { ageInYears } from "./users.logic";
 
-/** The consent decisions captured on the signup form (the 13+ affirmation is implicit + recorded). */
+/**
+ * Consent decisions optionally passed from the client (the 13+ affirmation is implicit + recorded).
+ * Demographic analytics is internal/anonymized, so when the client doesn't specify it we default it
+ * to granted server-side (see completeSignup). Marketing email isn't collected at signup right now —
+ * it derives to not-granted until the email system (and its opt-in UI) is built.
+ */
 export interface ConsentChoices {
-  demographics: boolean;
-  marketingEmail: boolean;
+  demographics?: boolean;
 }
 
 export interface CompleteSignupInput {
@@ -30,7 +34,7 @@ export interface CompleteSignupInput {
   email: string;
   legalName?: string; // PII-vault only (legal hold); never the public identity
   birthDate: string; // YYYY-MM-DD
-  consent: ConsentChoices;
+  consent?: ConsentChoices;
 }
 
 export type SignupOutcome =
@@ -57,11 +61,16 @@ export async function completeSignup(ctx: MutationCtx, input: CompleteSignupInpu
   const userId = newUserId();
   const birthYear = Number(input.birthDate.slice(0, 4));
 
+  // Demographic analytics consent: granted unless the client explicitly opts out. Internal,
+  // anonymized aggregate use — so "not specified" defaults to granted (the sensible default
+  // lives here in the business logic, not in any client form).
+  const demographicsGranted = input.consent?.demographics ?? true;
+
   // The users doc goes in first: its _id IS the new linkId (all one transaction, so
   // ordering is about data flow, not atomicity). A unique cosmos handle is assigned inside
   // insertUserItems — the public identity, derived from nothing the user typed.
   const linkId = await insertUserItems(ctx, {
-    demographicsConsent: input.consent.demographics,
+    demographicsConsent: demographicsGranted,
     birthYear,
   });
   await insertIdentity(ctx, PROVIDER.GOOGLE, input.subject, userId);
@@ -74,11 +83,12 @@ export async function completeSignup(ctx: MutationCtx, input: CompleteSignupInpu
     googleSub: input.subject,
   });
 
-  // Baseline consent ledger: the 13+ affirmation + one event per capturable purpose.
+  // Baseline consent ledger: the 13+ affirmation + the demographics default. Marketing email is
+  // intentionally not recorded here — it derives to not-granted until the email system + its
+  // opt-in flow exist (the ledger purpose stays available for that day).
   const base = { userId, policyVersion: CURRENT_POLICY_VERSION, source: CONSENT_SOURCE.SIGNUP } as const;
   await appendConsent(ctx, { ...base, purpose: CONSENT_PURPOSE.AGE_13PLUS, granted: true });
-  await appendConsent(ctx, { ...base, purpose: CONSENT_PURPOSE.DEMOGRAPHICS, granted: input.consent.demographics });
-  await appendConsent(ctx, { ...base, purpose: CONSENT_PURPOSE.MARKETING_EMAIL, granted: input.consent.marketingEmail });
+  await appendConsent(ctx, { ...base, purpose: CONSENT_PURPOSE.DEMOGRAPHICS, granted: demographicsGranted });
 
   return { status: "created", linkId };
 }

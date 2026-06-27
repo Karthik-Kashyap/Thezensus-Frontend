@@ -89,7 +89,8 @@ export function assertValidOption(poll: Doc<"polls">, optionId: string): void {
 export interface DemographicsSnapshot {
   gender?: string;
   ageAtVote?: number;
-  region?: string;
+  country?: string; // ISO-3166-1 alpha-2, e.g. "US"
+  state?: string; // ISO-3166-2, e.g. "US-CA"
   segments?: Record<string, string>;
 }
 
@@ -108,7 +109,8 @@ export async function demographicsSnapshot(
 
   const snapshot: DemographicsSnapshot = {};
   if (demo.gender !== undefined) snapshot.gender = demo.gender;
-  if (demo.region !== undefined) snapshot.region = demo.region;
+  if (demo.country !== undefined) snapshot.country = demo.country;
+  if (demo.state !== undefined) snapshot.state = demo.state;
   if (demo.birthYear !== undefined) {
     snapshot.ageAtVote = new Date().getUTCFullYear() - demo.birthYear;
   }
@@ -121,9 +123,10 @@ export async function demographicsSnapshot(
 
 /**
  * Flatten a snapshot to the voteEvents demographic MARGINAL dim keys the tally folds
- * ("gender#female", "age#25-34", "region#US-CA"). Age is BUCKETED (DESIGN-008) so the
- * marginal stays low-cardinality. Segments are NOT mixed in here — they live in segKey
- * (see `voteSegKey`); keeping them out keeps `dims` identity-free demographic buckets only.
+ * ("gender#female", "age#25-34", "country#US", "state#US-CA"). Age is BUCKETED (DESIGN-008)
+ * so the marginal stays low-cardinality; country/state are two SEPARATE flat marginals (never
+ * crossed). Segments are NOT mixed in here — they live in segKey (see `voteSegKey`); keeping
+ * them out keeps `dims` identity-free demographic buckets only.
  */
 export function toDims(snapshot: DemographicsSnapshot | undefined): string[] | undefined {
   if (!snapshot) return undefined;
@@ -132,7 +135,8 @@ export function toDims(snapshot: DemographicsSnapshot | undefined): string[] | u
   if (snapshot.ageAtVote !== undefined) {
     dims.push(dimKey(TALLY_DIMENSION.AGE, bucketAge(snapshot.ageAtVote)));
   }
-  if (snapshot.region !== undefined) dims.push(dimKey(TALLY_DIMENSION.REGION, snapshot.region));
+  if (snapshot.country !== undefined) dims.push(dimKey(TALLY_DIMENSION.COUNTRY, snapshot.country));
+  if (snapshot.state !== undefined) dims.push(dimKey(TALLY_DIMENSION.STATE, snapshot.state));
   return dims.length > 0 ? dims : undefined;
 }
 

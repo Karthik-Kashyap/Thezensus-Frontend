@@ -3,7 +3,6 @@
 import { useSession } from "@/lib/session";
 import { relativeTime } from "@/lib/format";
 import { ProfileEditor } from "@/components/profile/ProfileEditor";
-import { ConsentSettings } from "@/components/profile/ConsentSettings";
 import { DangerZone } from "@/components/profile/DangerZone";
 import { AvatarUploader } from "@/components/profile/AvatarUploader";
 import { SignInGate } from "@/components/auth/SignInGate";
@@ -49,7 +48,7 @@ export default function MyProfilePage() {
           <div>
             <h1 className="font-display text-2xl font-semibold tracking-tight">{user.handle || user.linkId.slice(0, 12)}</h1>
             <p className="text-sm text-muted-foreground">
-              {user.settings.email} · joined {relativeTime(user.createdAt)}
+              joined {relativeTime(user.createdAt)}
             </p>
           </div>
           <div className="flex gap-6 border-t pt-4">
@@ -64,7 +63,6 @@ export default function MyProfilePage() {
       </Card>
 
       <ProfileEditor user={user} />
-      <ConsentSettings />
       <DangerZone />
     </PageContainer>
   );

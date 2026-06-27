@@ -18,8 +18,11 @@ import {
   HOME_CANDIDATE_PER_COMMUNITY,
   DISCOVER_CANDIDATE_SCAN,
   TRENDING_TAGS_MAX,
+  RECURRENCE,
+  INTERVAL_MINUTES_ALLOWED,
   ballotKey,
   type PollVisibility,
+  type Recurrence,
 } from "./constants/poll";
 import {
   currentEditionLabel,
@@ -90,6 +93,27 @@ export function validateTimezone(timezone: string): void {
   } catch {
     throw badRequest("Unknown timezone");
   }
+}
+
+/**
+ * INTERVAL recurrence must carry a whitelisted slot length (INTERVAL_MINUTES_ALLOWED); every other
+ * cadence must NOT carry one (silently ignoring a stray interval would hide create-form bugs).
+ * Returns the value to persist (undefined for non-INTERVAL).
+ */
+export function validateRecurrenceInterval(
+  recurrence: Recurrence,
+  intervalMinutes: number | undefined,
+): number | undefined {
+  if (recurrence === RECURRENCE.INTERVAL) {
+    if (intervalMinutes === undefined || !INTERVAL_MINUTES_ALLOWED.has(intervalMinutes)) {
+      throw badRequest("Pick a valid interval length for an interval poll");
+    }
+    return intervalMinutes;
+  }
+  if (intervalMinutes !== undefined) {
+    throw badRequest("intervalMinutes applies to interval polls only");
+  }
+  return undefined;
 }
 
 // ── Poll media (create-time validation + denormalization) ───────────────────
@@ -221,9 +245,9 @@ export interface EditionView {
  */
 function nextEditionField(poll: Doc<"polls">, state: WindowState): { nextEditionAt?: number } {
   if (state !== "ACTIVE") return {};
-  const at = nextEditionStart(poll.recurrence, poll.timezone);
+  const at = nextEditionStart(poll.recurrence, poll.timezone, poll.intervalMinutes);
   if (at === undefined) return {};
-  const nextLabel = computeEditionLabel(poll.recurrence, poll.timezone, new Date(at));
+  const nextLabel = computeEditionLabel(poll.recurrence, poll.timezone, poll.intervalMinutes, new Date(at));
   if (windowState(nextLabel, poll.recurrenceStart, poll.recurrenceEnd) === "ENDED") return {};
   return { nextEditionAt: at };
 }
@@ -312,6 +336,7 @@ function toSummaryFields(poll: Doc<"polls">) {
     ...(poll.visibility !== undefined ? { visibility: poll.visibility } : {}),
     ballotMode: poll.ballotMode,
     recurrence: poll.recurrence,
+    ...(poll.intervalMinutes !== undefined ? { intervalMinutes: poll.intervalMinutes } : {}),
     ...(poll.recurrenceStart !== undefined ? { recurrenceStart: poll.recurrenceStart } : {}),
     ...(poll.recurrenceEnd !== undefined ? { recurrenceEnd: poll.recurrenceEnd } : {}),
     status: poll.status,
@@ -538,8 +563,12 @@ export function publiclyListable(poll: Doc<"polls">): boolean {
 }
 
 /** MANUAL/NONE polls store the authoritative label; time-based recompute (memo = display). */
-export function initialEditionLabel(recurrence: Doc<"polls">["recurrence"], timezone?: string): string {
-  return currentEditionLabel({ recurrence, timezone, currentEdition: undefined });
+export function initialEditionLabel(
+  recurrence: Doc<"polls">["recurrence"],
+  timezone?: string,
+  intervalMinutes?: number,
+): string {
+  return currentEditionLabel({ recurrence, timezone, intervalMinutes, currentEdition: undefined });
 }
 
 export { isTimeBased };
