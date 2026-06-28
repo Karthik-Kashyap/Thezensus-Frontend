@@ -1,7 +1,13 @@
 // ⚠️ DEV-ONLY SEED SURFACE — NOT product code. Populates the dev deployment with
-// fake-but-consistent content so the app feels alive before launch. Every mutation is
-// gated behind the ALLOW_SEED env var (set it ONLY on a dev deployment) and must never be
-// enabled in prod.
+// fake-but-consistent content so the app feels alive before launch.
+//
+// Every export here is INTERNAL (internalMutation/internalAction) — they are NOT on the
+// public client API and cannot be called by any browser/SDK client. The only way to run a
+// seed is the `run` action below, invoked from the admin-authed Convex CLI/dashboard:
+//   npx convex run seed:run                        # additive
+//   npx convex run seed:run '{ "wipe": true }'     # clean slate first
+// They are ALSO gated behind the ALLOW_SEED env var (set it ONLY on a dev deployment) as a
+// second layer, and must never be enabled in prod.
 //
 // These reuse the REAL domain helpers (signup, the vote write-path, the edition engine), so
 // every derived table — editions / votes / voteEvents / demographics / stats — ends up
@@ -11,7 +17,12 @@
 // never increments — so there's no double-count).
 
 import { v } from "convex/values";
-import { mutation } from "./_generated/server";
+import { internalAction, internalMutation } from "./_generated/server";
+import { internal } from "./_generated/api";
+import usersCfgRaw from "./seed_data/users.json";
+import commsCfgRaw from "./seed_data/communities.json";
+import pollsCfgRaw from "./seed_data/polls.json";
+import commentsCfgRaw from "./seed_data/comments.json";
 import { completeSignup } from "./lib/signup.logic";
 import { updateDemographics, bumpUserStats } from "./lib/users.model";
 import { newPollId, newCommunityId, newCommentId, newShareToken, newGuestVoter } from "./lib/ids";
@@ -48,7 +59,7 @@ function assertSeedEnabled(): void {
 
 /** Creates persona accounts through the real signup transaction, then sets the
  *  PII-free demographics (gender/country/state) the breakdowns read. Returns index→linkId. */
-export const seedUsers = mutation({
+export const seedUsers = internalMutation({
   args: {
     users: v.array(
       v.object({
@@ -113,7 +124,7 @@ const segmentInput = v.object({
 
 /** Idempotent by name (additive-safe): reuse an existing community of the same name,
  *  otherwise create it + its OWNER role. Then subscribe any members not already in. */
-export const seedCommunities = mutation({
+export const seedCommunities = internalMutation({
   args: {
     communities: v.array(
       v.object({
@@ -189,7 +200,7 @@ export const seedCommunities = mutation({
 
 /** One poll and everything that hangs off it, in one transaction. Mirrors the real
  *  create + vote write-paths so the data is indistinguishable from organic activity. */
-export const seedPoll = mutation({
+export const seedPoll = internalMutation({
   args: {
     creatorLinkId: v.string(),
     audienceType: v.optional(v.union(v.literal("COMMUNITY"), v.literal("LINK"))),
@@ -353,7 +364,7 @@ const SEED_TABLES = [
 
 /** Deletes every row from the seed-affected tables. Includes any account YOU created by
  *  logging in — you'd just sign in again afterwards. Pre-launch dev only. */
-export const wipe = mutation({
+export const wipe = internalMutation({
   args: {},
   handler: async (ctx) => {
     assertSeedEnabled();
@@ -365,5 +376,224 @@ export const wipe = mutation({
       counts[t] = docs.length;
     }
     return counts;
+  },
+});
+
+// ── Orchestrated run (the dev entry point) ────────────────────────────────────
+// Replaces the old client-side seed/seed.mjs, which reached the mutations above over the
+// public API (the reason they used to be public + destructive — a real exposure). The
+// mutations are now internal, and this action drives the whole expansion server-side. It is
+// only reachable via the admin-authed CLI/dashboard (`npx convex run seed:run`), never from
+// a client. The seed data lives in ./seed_data/*.json (edit those to change the content).
+
+// Typed views of the JSON config (resolveJsonModule widens literals to `string`, which the
+// downstream validators reject — so we assert the precise shapes here, once).
+interface UsersCfg {
+  count: number;
+  displayNames: string[];
+  bios: string[];
+  genders: string[];
+  locations: string[];
+  birthYearMin: number;
+  birthYearMax: number;
+  noBioFraction: number;
+}
+interface CommunityCfg {
+  name: string;
+  category?: string;
+  description?: string;
+  tags?: string[];
+  visibility?: "public" | "protected" | "private";
+  rules?: string;
+}
+interface CommsCfg {
+  memberFractionMin: number;
+  memberFractionMax: number;
+  communities: CommunityCfg[];
+}
+interface PollCfg {
+  community: string | null;
+  question: string;
+  type: "binary" | "multi";
+  options: string[];
+  ballotMode?: "standard" | "anonymous";
+  recurrence?: "NONE" | "DAILY" | "WEEKLY" | "MONTHLY" | "YEARLY" | "MANUAL";
+  timezone?: string;
+  recurrenceStart?: string;
+  recurrenceEnd?: string;
+  status?: "ACTIVE" | "CLOSED";
+  tags?: string[];
+  votes: number;
+  weights?: number[];
+  comments?: number;
+}
+interface PollsCfg {
+  polls: PollCfg[];
+}
+interface CommentsCfg {
+  comments: string[];
+}
+
+const usersCfg = usersCfgRaw as unknown as UsersCfg;
+const commsCfg = commsCfgRaw as unknown as CommsCfg;
+const pollsCfg = pollsCfgRaw as unknown as PollsCfg;
+const commentsCfg = commentsCfgRaw as unknown as CommentsCfg;
+
+// Tiny RNG helpers (non-deterministic on purpose — this is throwaway data). Math.random is
+// real in actions, so each run produces fresh variety (additive seeding stays varied).
+const randInt = (min: number, max: number): number =>
+  Math.floor(Math.random() * (max - min + 1)) + min;
+const pick = <T,>(arr: ReadonlyArray<T>): T => arr[Math.floor(Math.random() * arr.length)];
+const shuffle = <T,>(arr: ReadonlyArray<T>): T[] => {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+};
+const weightedIndex = (weights: number[]): number => {
+  const sum = weights.reduce((s, w) => s + w, 0);
+  let r = Math.random() * sum;
+  for (let i = 0; i < weights.length; i++) {
+    r -= weights[i];
+    if (r <= 0) return i;
+  }
+  return weights.length - 1;
+};
+const chunk = <T,>(arr: T[], n: number): T[][] => {
+  const out: T[][] = [];
+  for (let i = 0; i < arr.length; i += n) out.push(arr.slice(i, i + n));
+  return out;
+};
+// "US-CA" (ISO-3166-2) → { country: "US", state: "US-CA" } for the demographics split (DESIGN-008).
+const splitLocation = (loc: string) => ({ country: loc.split("-")[0], state: loc });
+
+export const run = internalAction({
+  args: { wipe: v.optional(v.boolean()) },
+  handler: async (ctx, { wipe }) => {
+    assertSeedEnabled();
+    const runId = Date.now().toString(36);
+    console.log(`→ Run id: ${runId}  ${wipe ? "(WIPE first)" : "(additive)"}`);
+
+    if (wipe) {
+      const counts = await ctx.runMutation(internal.seed.wipe, {});
+      const total = Object.values(counts).reduce((s, n) => s + n, 0);
+      console.log(`✗ Wiped ${total} rows across ${Object.keys(counts).length} tables.`);
+    }
+
+    // ── Users ──────────────────────────────────────────────────────────────────
+    const names = shuffle(usersCfg.displayNames).slice(0, usersCfg.count);
+    const userPayload = names.map((displayName, i) => {
+      const consent = Math.random() < 0.85;
+      const birthYear = randInt(usersCfg.birthYearMin, usersCfg.birthYearMax);
+      const handle = displayName.replace(/[^a-z0-9]/gi, "").toLowerCase() || "user";
+      return {
+        subject: `seed-${runId}-${i}`,
+        email: `${handle}.${runId}@seed.pollzens.test`,
+        displayName,
+        birthDate: `${birthYear}-06-15`,
+        ...(Math.random() > usersCfg.noBioFraction ? { bio: pick(usersCfg.bios) } : {}),
+        gender: pick(usersCfg.genders),
+        ...splitLocation(pick(usersCfg.locations)),
+        birthYear,
+        demographicsPublic: true,
+        demographicsConsent: consent,
+      };
+    });
+
+    const users: Array<{ linkId: string; displayName: string }> = [];
+    for (const batch of chunk(userPayload, 20)) {
+      const res = await ctx.runMutation(internal.seed.seedUsers, { users: batch });
+      for (const r of res) if (r.linkId) users.push({ linkId: r.linkId, displayName: r.displayName });
+    }
+    const allLinkIds = users.map((u) => u.linkId);
+    console.log(`✓ Users: ${users.length}`);
+
+    // ── Communities (each gets a random member subset) ───────────────────────────
+    const commInput = commsCfg.communities.map((c) => {
+      const frac =
+        commsCfg.memberFractionMin +
+        Math.random() * (commsCfg.memberFractionMax - commsCfg.memberFractionMin);
+      const members = shuffle(allLinkIds).slice(0, Math.max(3, Math.round(allLinkIds.length * frac)));
+      return { ...c, ownerLinkId: members[0], memberLinkIds: members };
+    });
+    const commRes = await ctx.runMutation(internal.seed.seedCommunities, { communities: commInput });
+    const membersByName = new Map(commInput.map((c) => [c.name, c.memberLinkIds]));
+    const idByName = new Map(commRes.map((c) => [c.name, c.communityId]));
+    console.log(
+      `✓ Communities: ${commRes.map((c) => `${c.name}${c.created ? "" : " (reused)"}`).join(", ")}`,
+    );
+
+    // ── Polls (+ votes + comments) ───────────────────────────────────────────────
+    let pollCount = 0,
+      voteCount = 0,
+      commentCount = 0;
+    for (const p of pollsCfg.polls) {
+      const isLink = p.community === null || p.community === undefined;
+      const options = p.options.map((label, i) => ({ id: `o${i + 1}`, label }));
+      const weights = p.weights ?? options.map(() => 1);
+
+      let creatorLinkId: string;
+      let communityId: string | undefined;
+      let voterPool: string[];
+      if (isLink) {
+        creatorLinkId = pick(allLinkIds);
+        communityId = undefined;
+        voterPool = allLinkIds;
+      } else {
+        const members = membersByName.get(p.community!) ?? allLinkIds;
+        creatorLinkId = pick(members);
+        communityId = idByName.get(p.community!);
+        voterPool = members;
+      }
+
+      const anonymous = p.ballotMode === "anonymous";
+      const votes: Array<{ voterLinkId?: string; optionId: string }> = [];
+      if (anonymous) {
+        for (let i = 0; i < p.votes; i++) {
+          votes.push({ optionId: options[weightedIndex(weights)].id });
+        }
+      } else {
+        // attributable: one vote per voter, so cap at the available pool
+        const voters = shuffle(voterPool).slice(0, Math.min(p.votes, voterPool.length));
+        for (const voterLinkId of voters) {
+          votes.push({ voterLinkId, optionId: options[weightedIndex(weights)].id });
+        }
+      }
+
+      const nComments = Math.min(p.comments ?? 0, commentsCfg.comments.length);
+      const comments = shuffle(commentsCfg.comments)
+        .slice(0, nComments)
+        .map((text) => ({
+          authorLinkId: pick(isLink ? allLinkIds : (membersByName.get(p.community!) ?? allLinkIds)),
+          text,
+        }));
+
+      const res = await ctx.runMutation(internal.seed.seedPoll, {
+        creatorLinkId,
+        audienceType: isLink ? "LINK" : "COMMUNITY",
+        ...(communityId ? { communityId } : {}),
+        question: p.question,
+        type: p.type,
+        options,
+        ballotMode: p.ballotMode ?? "standard",
+        ...(p.recurrence ? { recurrence: p.recurrence } : {}),
+        ...(p.timezone ? { timezone: p.timezone } : {}),
+        ...(p.recurrenceStart ? { recurrenceStart: p.recurrenceStart } : {}),
+        ...(p.recurrenceEnd ? { recurrenceEnd: p.recurrenceEnd } : {}),
+        ...(p.status ? { status: p.status } : {}),
+        ...(p.tags ? { tags: p.tags } : {}),
+        votes,
+        comments,
+      });
+      pollCount++;
+      voteCount += res.votes;
+      commentCount += res.comments;
+    }
+
+    console.log(`✓ Done: ${pollCount} polls, ${voteCount} votes, ${commentCount} comments.`);
+    console.log("Live vote tallies finish publishing within ~5–10s (tally cron). Refresh the site.");
+    return { users: users.length, polls: pollCount, votes: voteCount, comments: commentCount };
   },
 });

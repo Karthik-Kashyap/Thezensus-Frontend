@@ -155,11 +155,14 @@ export const LIVE_FEED = {
   visibleFraction: 0.5,
 } as const;
 
-/** Member-question (segment) editor limits — mirrors COMMUNITY_LIMITS in community-service. */
+/** Member-question (segment) editor limits — MUST mirror COMMUNITY_LIMITS in
+ *  convex/lib/constants/community.ts. The 5×4 ceiling is the DESIGN-008 cross-tab row
+ *  budget (4^5 = 1024); the backend hard-rejects anything over it, so keep these in lockstep
+ *  or the editor lets users build configs the create mutation will refuse. */
 export const SEGMENT_LIMITS = {
-  questionsMax: 8,
+  questionsMax: 5,
   optionsMin: 2,
-  optionsMax: 12,
+  optionsMax: 4,
   labelMax: 120,
   optionMax: 60,
 } as const;

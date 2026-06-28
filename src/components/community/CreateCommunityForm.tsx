@@ -62,7 +62,12 @@ export function CreateCommunityForm() {
       toast.success("Community created");
       router.push(routes.community(community.communityId));
     },
-    onError: () => toast.error("Could not create the community."),
+    onError: (e) => {
+      // Surface the backend's specific validation reason (e.g. "At most 5 member questions")
+      // on a 400 — a generic message hides why a create was refused. Fall back otherwise.
+      const err = e as { status?: number; message?: string };
+      toast.error(err.status === 400 && err.message ? err.message : "Could not create the community.");
+    },
   });
 
   // Topics — bare lowercase tokens (the "#nba" model), deduped, capped. Mirrors the poll forms.
